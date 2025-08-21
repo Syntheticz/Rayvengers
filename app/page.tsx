@@ -3,9 +3,13 @@ import FirstPage from "@/components/slides/first-page";
 
 export default function Home() {
   const slides = [
-    <FirstPage />,
-    <div className="p-10 bg-green-200 rounded-lg">Slide 2: About</div>,
-    <div className="p-10 bg-pink-200 rounded-lg">Slide 3: Contact</div>,
+    <FirstPage key={1} />,
+    <div className="p-10 bg-green-200 rounded-lg" key={2}>
+      Slide 2: About
+    </div>,
+    <div className="p-10 bg-pink-200 rounded-lg" key={3}>
+      Slide 3: Contact
+    </div>,
   ];
 
   return (
