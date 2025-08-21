@@ -16,7 +16,7 @@ export default function Game() {
   const [me, setMe] = useState<Player | null>(null);
 
   useEffect(() => {
-    const newSocket = io("https://66573f54cdcc.ngrok-free.app");
+    const newSocket = io("http://localhost:3000");
 
     newSocket.on("connect", () => {
       console.log("✅ Connected:", newSocket.id);

@@ -1,4 +1,3 @@
-
 import Slider from "../components/slider";
 import TitleSlide from "../components/slides/TitleSlide";
 import StorySlide from "../components/slides/StorySlide";
