@@ -66,6 +66,8 @@ const Slider: React.FC<SliderProps> = ({ slides }) => {
     };
   }, [currentSlide]);
 
+  const slideType = (slides[currentSlide] as any)?.type?.name;
+  const isAuthScreen = slideType === "StudentAuth" || slideType === "TeacherAuth";
   return (
     <div className="slider mx-auto text-center">
       <div className="slides relative">
@@ -73,8 +75,6 @@ const Slider: React.FC<SliderProps> = ({ slides }) => {
           className: `${(slides[currentSlide] as any).props.className} slide active`,
         })}
       </div>
-
-      {/* Navigation buttons */}
       <div
         className="navigation"
         style={{
@@ -96,7 +96,7 @@ const Slider: React.FC<SliderProps> = ({ slides }) => {
             border: "none",
             borderRadius: "32px",
             fontWeight: "bold",
-            fontSize: "clamp(0.5rem, 2vw, 1rem)",
+            fontSize: "clamp(0.5rem, 2vw, .8rem)",
             padding: "8px 0",
             minWidth: "90px",
             maxWidth: "120px",
@@ -119,7 +119,7 @@ const Slider: React.FC<SliderProps> = ({ slides }) => {
             border: "none",
             borderRadius: "32px",
             fontWeight: "bold",
-            fontSize: "clamp(0.8rem, 3vw, 1rem)",
+            fontSize: "clamp(0.5rem, 3vw, .8rem)",
             padding: "8px 0",
             minWidth: "90px",
             maxWidth: "120px",
