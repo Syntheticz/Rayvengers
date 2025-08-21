@@ -1,15 +1,17 @@
-import Slider from "@/components/slider";
-import FirstPage from "@/components/slides/first-page";
+
+import Slider from "../components/slider";
+import TitleSlide from "../components/slides/TitleSlide";
+import StorySlide from "../components/slides/StorySlide";
+import GuideSlide from "../components/slides/GuideSlide";
 
 export default function Home() {
   const slides = [
-    <FirstPage />,
-    <div className="p-10 bg-green-200 rounded-lg">Slide 2: About</div>,
-    <div className="p-10 bg-pink-200 rounded-lg">Slide 3: Contact</div>,
+    <TitleSlide key="title" />,
+    <StorySlide key="story" />,
+    <GuideSlide key="guide" />,
   ];
-
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center">
+    <main className="min-h-screen flex flex-col items-center justify-center w-screen">
       <Slider slides={slides} />
     </main>
   );
