@@ -11,15 +11,15 @@ const Slider: React.FC<SliderProps> = ({ slides }) => {
   const totalSlides = slides.length;
 
   const showSlide = useCallback(
-    (n: number) => {
-      if (n >= totalSlides) {
-        setCurrentSlide(0);
-      } else if (n < 0) {
-        setCurrentSlide(totalSlides - 1);
-      } else {
-        setCurrentSlide(n);
-      }
-    },
+      (n: number) => {
+        if (n >= totalSlides) {
+          setCurrentSlide(totalSlides - 1);
+        } else if (n < 0) {
+          setCurrentSlide(0);
+        } else {
+          setCurrentSlide(n);
+        }
+      },
     [totalSlides]
   );
 
@@ -66,40 +66,71 @@ const Slider: React.FC<SliderProps> = ({ slides }) => {
     };
   }, [currentSlide]);
 
+  const slideType = (slides[currentSlide] as any)?.type?.name;
+  const isAuthScreen = slideType === "StudentAuth" || slideType === "TeacherAuth";
   return (
-    <div className="slider max-w-lg mx-auto text-center">
+    <div className="slider mx-auto text-center">
       <div className="slides relative">
-        {slides.map((slide, index) => (
-          <div
-            key={index}
-            className={`slide transition-opacity duration-500 ${
-              index === currentSlide
-                ? "opacity-100"
-                : "opacity-0 absolute inset-0"
-            }`}
-          >
-            {slide}
-          </div>
-        ))}
+        {React.cloneElement(slides[currentSlide] as React.ReactElement, {
+          className: `${(slides[currentSlide] as any).props.className} slide active`,
+        })}
       </div>
-
-      {/* Navigation buttons */}
-      <div className="flex justify-between mt-4">
+      <div
+        className="navigation"
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          justifyContent: "center",
+          alignItems: "center",
+          gap: "10px",
+          margin: "32px 0 0 0",
+        }}
+      >
         <button
+          className="nav-btn"
           id="prevBtn"
+          style={{
+            fontFamily: "'Press Start 2P', cursive",
+            background: "#c97a2d",
+            color: "#8a0c1c",
+            border: "none",
+            borderRadius: "32px",
+            fontWeight: "bold",
+            fontSize: "clamp(0.5rem, 2vw, .8rem)",
+            padding: "8px 0",
+            minWidth: "90px",
+            maxWidth: "120px",
+            boxShadow: "2px 2px 6px rgba(0,0,0,0.2)",
+            letterSpacing: "2px",
+            transition: "background 0.2s",
+          }}
           onClick={() => changeSlide(-1)}
           disabled={currentSlide === 0}
-          className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
         >
-          Prev
+          <span style={{ marginRight: "6px" }}>◀</span>PREV
         </button>
         <button
+          className="nav-btn"
           id="nextBtn"
+          style={{
+            fontFamily: "'Press Start 2P', cursive",
+            background: "#ffd600",
+            color: "#8a0c1c",
+            border: "none",
+            borderRadius: "32px",
+            fontWeight: "bold",
+            fontSize: "clamp(0.5rem, 3vw, .8rem)",
+            padding: "8px 0",
+            minWidth: "90px",
+            maxWidth: "120px",
+            boxShadow: "2px 2px 6px rgba(0,0,0,0.2)",
+            letterSpacing: "2px",
+            transition: "background 0.2s",
+          }}
           onClick={() => changeSlide(1)}
           disabled={currentSlide === totalSlides - 1}
-          className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
         >
-          Next
+          NEXT<span style={{ marginLeft: "6px" }}>▶</span>
         </button>
       </div>
     </div>

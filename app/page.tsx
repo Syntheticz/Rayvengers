@@ -1,19 +1,21 @@
-import Slider from "@/components/slider";
-import FirstPage from "@/components/slides/first-page";
+
+import Slider from "../components/slider";
+import TitleSlide from "../components/slides/TitleSlide";
+import StorySlide from "../components/slides/StorySlide";
+import GuideSlide from "../components/slides/GuideSlide";
+import GuideSlide2 from "@/components/slides/GuideSlide2";
+import RoleSlide from "../components/slides/RoleSlide";
 
 export default function Home() {
   const slides = [
-    <FirstPage key={1} />,
-    <div className="p-10 bg-green-200 rounded-lg" key={2}>
-      Slide 2: About
-    </div>,
-    <div className="p-10 bg-pink-200 rounded-lg" key={3}>
-      Slide 3: Contact
-    </div>,
+    <TitleSlide key="title" />,
+    <StorySlide key="story" />,
+    <GuideSlide key="guide" />,
+    <GuideSlide2 key="guide2" />,
+    <RoleSlide key="role" />,
   ];
-
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center">
+    <main className="min-h-screen flex flex-col items-center justify-center w-screen">
       <Slider slides={slides} />
     </main>
   );
