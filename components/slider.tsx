@@ -23,9 +23,12 @@ const Slider: React.FC<SliderProps> = ({ slides }) => {
     [totalSlides]
   );
 
-  const changeSlide = (direction: number) => {
-    showSlide(currentSlide + direction);
-  };
+  const changeSlide = useCallback(
+    (direction: number) => {
+      showSlide(currentSlide + direction);
+    },
+    [currentSlide, showSlide]
+  );
 
   // Keyboard navigation
   useEffect(() => {
@@ -36,7 +39,7 @@ const Slider: React.FC<SliderProps> = ({ slides }) => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentSlide]);
+  }, [currentSlide, changeSlide]);
 
   // Touch/swipe navigation
   useEffect(() => {
@@ -64,16 +67,17 @@ const Slider: React.FC<SliderProps> = ({ slides }) => {
       window.removeEventListener("touchstart", handleTouchStart);
       window.removeEventListener("touchend", handleTouchEnd);
     };
-  }, [currentSlide]);
+  }, [currentSlide, changeSlide]);
 
-  const slideType = (slides[currentSlide] as any)?.type?.name;
-  const isAuthScreen = slideType === "StudentAuth" || slideType === "TeacherAuth";
   return (
     <div className="slider mx-auto text-center">
       <div className="slides relative">
-        {React.cloneElement(slides[currentSlide] as React.ReactElement, {
-          className: `${(slides[currentSlide] as any).props.className} slide active`,
-        })}
+        {React.cloneElement(
+          slides[currentSlide] as React.ReactElement<any>,
+          {
+            className: `${(slides[currentSlide] as React.ReactElement<any>).props.className ?? ""} slide active`,
+          }
+        )}
       </div>
       <div
         className="navigation"
