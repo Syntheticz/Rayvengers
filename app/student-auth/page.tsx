@@ -20,6 +20,7 @@ export default function StudentAuth() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     alert(`${mode === "signup" ? "Signed up" : "Logged in"} as student!`);
+    router.push("/student/guide");
   };
   function push(path: string): void {
     router.push(path);
@@ -75,7 +76,7 @@ export default function StudentAuth() {
             {mode === "signup" ? (
               <span style={{ color: "#b80f2c", cursor: "pointer", fontSize: "0.70rem" }} onClick={() => setMode("login")}>Already have an account? Log in</span>
             ) : (
-              <span style={{ color: "#b80f2c", cursor: "pointer", fontSize: "0.70rem" }} onClick={() => setMode("signup")}>Don't have an account? Sign up</span>
+              <span style={{ color: "#b80f2c", cursor: "pointer", fontSize: "0.70rem" }} onClick={() => setMode("signup")}>Don&apos;t have an account? Sign up</span>
             )}
           </div>
           <button type="button" style={{ ...buttonStyle, background: "#eee", color: "#b80f2c", marginTop: "0" }} onClick={() => push("/")}>Back</button>
