@@ -21,6 +21,10 @@ export default function StudentAuth() {
     e.preventDefault();
     alert(`${mode === "signup" ? "Signed up" : "Logged in"} as student!`);
   };
+  function push(path: string): void {
+    router.push(path);
+  }
+
   return (
     <div style={{ minHeight: "100vh", width: "100vw", background: "#b80f2c", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
       <div style={{
