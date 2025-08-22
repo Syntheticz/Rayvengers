@@ -1,8 +1,10 @@
 "use client";
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import type { CSSProperties } from "react";
 
 export default function StudentAuth() {
-  const { push } = require('next/navigation').useRouter();
+  const router = useRouter();
   const [mode, setMode] = useState<"signup" | "login">("signup");
   const [form, setForm] = useState({
     name: "",
@@ -79,14 +81,15 @@ export default function StudentAuth() {
   );
 }
 
-const labelStyle = {
+const labelStyle: CSSProperties = {
   fontFamily: "'Press Start 2P', cursive",
   color: "#b80f2c",
   fontSize: "0.85rem",
   marginBottom: "3px",
   textAlign: "left",
 };
-const inputStyle = {
+
+const inputStyle: CSSProperties = {
   fontFamily: "'Press Start 2P', cursive",
   fontSize: "0.95rem",
   padding: "7px 10px",
@@ -98,7 +101,8 @@ const inputStyle = {
   color: "#8a0c1c",
   boxSizing: "border-box",
 };
-const buttonStyle = {
+
+const buttonStyle: CSSProperties = {
   fontFamily: "Bangers, cursive",
   fontSize: "1rem",
   background: "#b80f2c",
