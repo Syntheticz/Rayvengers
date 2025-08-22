@@ -46,7 +46,7 @@ export default function StorySlide({ className = "slide active story-slide" }: S
           </span>.
         </p>
         <p>
-          The <span className="highlight" style={{ color: "#ffcc66", fontWeight: "bold" }}>RayVengers</span>, a team of young scientists, are tasked to protect the Earth from a growing "Shadow of Ignorance" that clouds people's understanding of science.
+          The <span className="highlight" style={{ color: "#ffcc66", fontWeight: "bold" }}>RayVengers</span>, a team of young scientists, are tasked to protect the Earth from a growing &quot;Shadow of Ignorance&quot; that clouds people&apos;s understanding of science.
         </p>
         <p className="mission-text">
           Your mission is to join the <span className="highlight" style={{ color: "#ffcc66", fontWeight: "bold" }}>RayVengers</span> and harness the power of mirrors and lenses.
