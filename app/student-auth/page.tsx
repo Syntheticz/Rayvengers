@@ -15,6 +15,7 @@ type FormValues = {
 
 export default function StudentAuth() {
   const router = useRouter();
+  const router = useRouter();
   const [mode, setMode] = useState<"signup" | "login">("signup");
 
   const {

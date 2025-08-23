@@ -6,7 +6,7 @@ interface GuideSlide2Props {
 
 export default function GuideSlide2({ className = "slide active guide-slide" }: GuideSlide2Props) {
   return (
-    <div className={className} style={{ minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
+    <div className={className} style={{ minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", paddingTop: "64px", paddingBottom: "64px" }}>
       <h1
         style={{
           fontFamily: "Bangers, cursive",
