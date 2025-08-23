@@ -13,6 +13,7 @@ export default function TeacherAuth() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     alert("Logged in as teacher!");
+    push("/teacher/dashboard");
   };
   return (
     <div style={{ minHeight: "100vh", background: "#a50021", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
