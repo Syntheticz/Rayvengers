@@ -17,20 +17,11 @@ export default function HeroGuide5({ className = "slide active guide-slide" }: H
         <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "14px" }}>
           <div style={{ background: "#b80f2c", borderRadius: "18px", boxShadow: "0 4px 16px rgba(0,0,0,0.10)", border: "2px solid #ffcc66", padding: "18px 12px 16px 12px", marginBottom: "0", display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
             <span style={{ fontFamily: "'Press Start 2P', cursive", fontWeight: "bold", fontSize: "clamp(0.95rem, 2vw, 1.1rem)", marginBottom: "12px", textAlign: "left", display: "block", letterSpacing: "1px", color: "#fff" }}>
-              <span style={{ color: "#ffcc66" }}>• Center of Curvature, C</span> -<br />
-              the center of the sphere of<br />
-              which the mirror is part. Its<br />
-              distance from the mirror is<br />
-              known as the radius.<br />
-              <span>
-                <span style={{ color: "#ffcc66" }}>• Vertex, V</span> - the center of the<br />
-                mirror.<br />
-                <span style={{ color: "#ffcc66" }}>• Focal Point/ Focus, F</span> - the<br />
-                point between the center of<br />
-                the curvature and vertex. Its<br />
-                distance from the mirror is<br />
-                known as the focal length, f.
-              </span>
+              <span style={{ color: "#ffcc66" }}>• Center of Curvature, C</span> - the center of the sphere of which the mirror is part. Its distance from the mirror is known as the radius.
+              <br />
+              <span style={{ color: "#ffcc66" }}>• Vertex, V</span> - the center of the mirror.
+              <br />
+              <span style={{ color: "#ffcc66" }}>• Focal Point/ Focus, F</span> - the point between the center of the curvature and vertex. Its distance from the mirror is known as the focal length, f.
             </span>
           </div>
         </div>
