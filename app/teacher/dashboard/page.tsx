@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 
 interface LeaderboardRow {
   rank: number;
@@ -105,7 +106,7 @@ export default function TeacherDashboard() {
           <div style={{ marginTop: 28, display: "flex", gap: 12 }}>
             <button onClick={saveChanges} style={{ background: "#ffcc66", border: "none", padding: "10px 16px", borderRadius: 10, cursor: "pointer", fontWeight: 700 }}>Save changes</button>
             <button onClick={startGame} style={{ background: "#b80f2c", color: "#fff", border: "none", padding: "10px 16px", borderRadius: 10, cursor: "pointer", fontWeight: 700 }}>Start game</button>
-            <button onClick={() => router.push("/teacher/auth") } style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', padding: '8px 12px', borderRadius: 8, color: '#fff' }}>Logout</button>
+            <button onClick={() => {signOut({ redirectTo: "/" })}} style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', padding: '8px 12px', borderRadius: 8, color: '#fff' }}>Logout</button>
           </div>
         </section>
 
