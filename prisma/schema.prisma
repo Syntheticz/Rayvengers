@@ -6,3 +6,22 @@ datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
 }
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  firstname String?
+  lastname  String?
+  email     String   @unique
+  age       Int
+  section   String
+  isDeleted Boolean  @default(false)
+  role      String
+  birthday  DateTime
+  password  String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name]) // Indexing for performance
+}

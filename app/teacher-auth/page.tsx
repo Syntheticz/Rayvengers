@@ -3,6 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
+import { signIn } from "next-auth/react";
 
 type TeacherFormValues = {
   email: string;
@@ -18,13 +19,17 @@ export default function TeacherAuth() {
     formState: { errors },
   } = useForm<TeacherFormValues>({
     defaultValues: {
-      email: "teacher@example.com",
-      password: "password123",
+      email: "",
+      password: "",
     },
   });
 
   const onSubmit = (data: TeacherFormValues) => {
-    alert("Logged in as teacher!\n" + JSON.stringify(data, null, 2));
+    signIn("credentials", {
+      email: data.email,
+      password: data.password,
+      redirectTo: "/teacher/dashboard",
+    });
   };
 
   return (
@@ -88,7 +93,14 @@ export default function TeacherAuth() {
           <input
             type="email"
             placeholder="Email"
-            {...register("email", { required: "Email is required" })}
+            {...register("email", {
+              required: "Email is required",
+              pattern: {
+                value: /^[A-Za-z0-9._%+-]+@deped\.gov\.ph$/,
+                message:
+                  "Only DepEd emails are allowed (e.g., name@deped.gov.ph)",
+              },
+            })}
             style={inputStyle}
           />
           {errors.email && (

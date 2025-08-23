@@ -3,18 +3,11 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-
-type FormValues = {
-  name?: string;
-  age?: number;
-  birthday?: string;
-  section?: string;
-  email: string;
-  password: string;
-};
+import { createUser } from "@/lib/queries";
+import { User } from "@prisma/client";
+import { signIn } from "next-auth/react";
 
 export default function StudentAuth() {
-  const router = useRouter();
   const router = useRouter();
   const [mode, setMode] = useState<"signup" | "login">("signup");
 
@@ -22,13 +15,29 @@ export default function StudentAuth() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<FormValues>();
+  } = useForm<User>({
+    defaultValues: {
+      name: "",
+      age: 0,
+      birthday: undefined,
+      section: "",
+      email: "",
+      password: "",
+    },
+  });
 
-  const onSubmit = (data: FormValues) => {
-    alert(
-      `${mode === "signup" ? "Signed up" : "Logged in"} as student!\n` +
-        JSON.stringify(data, null, 2)
-    );
+  const onSubmit = async (data: User) => {
+    if (mode === "signup") {
+      await createUser({ ...data, role: "Student" });
+      alert("Success!");
+      setMode("login");
+    } else {
+      signIn("credentials", {
+        email: data.email,
+        password: data.password,
+        redirectTo: "/student/guide",
+      });
+    }
   };
 
   return (
@@ -103,7 +112,7 @@ export default function StudentAuth() {
               <label style={labelStyle}>Birthday</label>
               <input
                 type="date"
-                {...register("birthday", { required: true })}
+                {...register("birthday", { required: true, valueAsDate: true })}
                 style={inputStyle}
               />
               {errors.birthday && (
@@ -171,7 +180,7 @@ export default function StudentAuth() {
                 }}
                 onClick={() => setMode("signup")}
               >
-                Don't have an account? Sign up
+                Don&apos;t have an account? Sign up
               </span>
             )}
           </div>
