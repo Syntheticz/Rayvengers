@@ -4,11 +4,13 @@ import React, { useState, useEffect, useCallback } from "react";
 
 interface SliderProps {
   slides: React.ReactNode[];
+  onLastNext?: () => void;
 }
 
-const Slider: React.FC<SliderProps> = ({ slides }) => {
+const Slider: React.FC<SliderProps> = ({ slides, onLastNext }) => {
   const [currentSlide, setCurrentSlide] = useState<number>(0);
   const totalSlides = slides.length;
+  // Removed unused router
 
   const showSlide = useCallback(
       (n: number) => {
@@ -25,9 +27,16 @@ const Slider: React.FC<SliderProps> = ({ slides }) => {
 
   const changeSlide = useCallback(
     (direction: number) => {
-      showSlide(currentSlide + direction);
+      if (currentSlide === totalSlides - 1 && direction === 1) {
+        if (onLastNext) {
+          onLastNext();
+        }
+        // If no onLastNext, do nothing (stay on last slide)
+      } else {
+        showSlide(currentSlide + direction);
+      }
     },
-    [currentSlide, showSlide]
+    [currentSlide, showSlide, totalSlides, onLastNext]
   );
 
   // Keyboard navigation
@@ -132,7 +141,7 @@ const Slider: React.FC<SliderProps> = ({ slides }) => {
             transition: "background 0.2s",
           }}
           onClick={() => changeSlide(1)}
-          disabled={currentSlide === totalSlides - 1}
+          disabled={currentSlide === totalSlides - 1 && !onLastNext}
         >
           NEXT<span style={{ marginLeft: "6px" }}>▶</span>
         </button>
