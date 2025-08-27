@@ -16,7 +16,7 @@ interface Player {
   color: string;
 }
 
-let players: Record<string, Player> = {};
+const players: Record<string, Player> = {};
 
 app.prepare().then(() => {
   const httpServer = createServer(handler);
@@ -62,3 +62,4 @@ app.prepare().then(() => {
     console.log(`🚀 Game server at http://${hostname}:${port}`);
   });
 });
+

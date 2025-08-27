@@ -14,14 +14,28 @@ export default function StudentLobby() {
   const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
-    const s = io("http://localhost:3000"); 
+  const s = io("http://localhost:3000");
     setSocket(s);
 
-    s.on("lobbyUpdate", (data: Student[]) => setStudents(data));
+    console.log("[lobby] attempting socket connect to http://localhost:3000");
 
-    s.emit("joinLobby", {
-      name: localStorage.getItem("name") || "You",
-      section: localStorage.getItem("section") || "?"
+    s.on("connect", () => {
+      console.log("[lobby] connected", s.id);
+      s.emit("joinLobby", {
+        name: localStorage.getItem("name") || "You",
+        section: localStorage.getItem("section") || "?"
+      }, (ackPayload: any) => {
+        console.log("[lobby] joinLobby ack:", ackPayload);
+      });
+    });
+
+    s.on("lobbyUpdate", (data: Student[]) => {
+      console.log("[lobby] received lobbyUpdate", data);
+      setStudents(data);
+    });
+
+    s.on("joined", (payload: any) => {
+      console.log("[lobby] joined ack:", payload);
     });
 
     return () => {
