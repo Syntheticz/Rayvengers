@@ -22,8 +22,7 @@ export default function StudentLobby() {
     s.on("connect", () => {
       console.log("[lobby] connected", s.id);
       s.emit("joinLobby", {
-        name: localStorage.getItem("name") || "You",
-        section: localStorage.getItem("section") || "?"
+        socketId: s.id
       }, (ackPayload: any) => {
         console.log("[lobby] joinLobby ack:", ackPayload);
       });

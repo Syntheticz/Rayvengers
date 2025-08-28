@@ -1,6 +1,9 @@
 import { createServer } from "http";
 import next from "next";
 import { Server } from "socket.io";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
@@ -8,15 +11,14 @@ const port = 3000;
 const app = next({ dev, hostname, port });
 const handler = app.getRequestHandler();
 
-// Store all connected players
-interface Player {
+// Store lobby students
+interface LobbyStudent {
   id: string;
-  x: number;
-  y: number;
-  color: string;
+  name: string;
+  section: string;
 }
 
-const players: Record<string, Player> = {};
+const lobby: Record<string, LobbyStudent> = {};
 
 app.prepare().then(() => {
   const httpServer = createServer(handler);
@@ -25,41 +27,56 @@ app.prepare().then(() => {
   });
 
   io.on("connection", (socket) => {
-    console.log("🔌 Player connected:", socket.id);
+    console.log("🔌 Student connected:", socket.id);
 
-    // Assign random color + start pos
-    players[socket.id] = {
-      id: socket.id,
-      x: Math.floor(Math.random() * 400),
-      y: Math.floor(Math.random() * 400),
-      color: `hsl(${Math.random() * 360}, 70%, 50%)`,
-    };
-
-    // Send current players to new player
-    socket.emit("players", players);
-
-    // Broadcast new player to everyone
-    socket.broadcast.emit("player-joined", players[socket.id]);
-
-    // When player moves
-    socket.on("move", ({ x, y }) => {
-      if (players[socket.id]) {
-        players[socket.id].x = x;
-        players[socket.id].y = y;
-        io.emit("player-moved", players[socket.id]);
+    socket.emit("lobbyUpdate", Object.values(lobby));
+    socket.on("joinLobby", async (payload, ack) => {
+      try {
+        // For now, use socket ID as identifier - should be using the database name and section
+        const socketId = payload?.socketId || socket.id;
+        const name = `Student-${socketId.slice(-4)}`;
+        const section = "A"; // Default section
+        
+        console.log("received joinLobby from", socket.id, "payload:", payload);
+        lobby[socket.id] = {
+          id: socket.id,
+          name: name,
+          section: section,
+        };
+        
+        const updated = Object.values(lobby);
+        io.emit("lobbyUpdate", updated);
+        console.log(`Student joined: ${lobby[socket.id].name} [${lobby[socket.id].section}]`);
+        console.log("emitted lobbyUpdate", updated.length, "entries");
+        
+        if (typeof ack === "function") {
+          try {
+            ack(lobby[socket.id]);
+          } catch (e) {
+            console.warn("ack callback error", e);
+          }
+        } else {
+          // Fallback emit
+          socket.emit("joined", lobby[socket.id]);
+        }
+      } catch (error) {
+        console.error("Error in joinLobby:", error);
+        if (typeof ack === "function") {
+          ack({ error: "Failed to join lobby" });
+        }
       }
     });
 
     // When player disconnects
     socket.on("disconnect", () => {
-      console.log("❌ Player left:", socket.id);
-      delete players[socket.id];
-      io.emit("player-left", socket.id);
+      console.log("❌ Student left:", socket.id);
+      delete lobby[socket.id];
+      io.emit("lobbyUpdate", Object.values(lobby));
     });
   });
 
   httpServer.listen(port, () => {
-    console.log(`🚀 Game server at http://${hostname}:${port}`);
+    console.log(`🚀 Lobby server at http://${hostname}:${port}`);
   });
 });
 
