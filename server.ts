@@ -30,6 +30,7 @@ app.prepare().then(() => {
     console.log("🔌 Student connected:", socket.id);
 
     socket.emit("lobbyUpdate", Object.values(lobby));
+    
     socket.on("joinLobby", async (payload, ack) => {
       try {
         // For now, use socket ID as identifier - should be using the database name and section
@@ -65,6 +66,33 @@ app.prepare().then(() => {
           ack({ error: "Failed to join lobby" });
         }
       }
+    });
+
+    // Handle game start from teacher
+    socket.on("startGame", (gameData) => {
+      console.log("🎮 Teacher started game:", gameData);
+      console.log("📊 Current lobby students:", Object.keys(lobby));
+      console.log("🔗 Total connected clients:", io.engine.clientsCount);
+      
+      // First send a test event to check if students receive it
+      io.emit("testEvent", { message: "Test event from server" });
+      console.log("📤 Sent testEvent to all clients");
+      
+      // Notify all students in lobby to start the game
+      const gameStartData = {
+        chapter: gameData.chapter || "chapter1",
+        level: gameData.level || "level1",
+        message: "Game is starting! Get ready..."
+      };
+      
+      io.emit("gameStarted", gameStartData);
+      console.log("📤 Sent gameStarted event to all clients:", gameStartData);
+      
+      // Send acknowledgment back to teacher
+      socket.emit("gameStartAck", {
+        studentsNotified: Object.keys(lobby).length,
+        totalClients: io.engine.clientsCount
+      });
     });
 
     // When player disconnects

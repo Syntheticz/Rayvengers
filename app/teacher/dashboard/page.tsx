@@ -2,11 +2,18 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { io, Socket } from "socket.io-client";
 
 interface LeaderboardRow {
   rank: number;
   team: string;
   score: number;
+}
+
+interface LobbyStudent {
+  id: string;
+  name: string;
+  section: string;
 }
 
 export default function TeacherDashboard() {
@@ -17,6 +24,8 @@ export default function TeacherDashboard() {
     c3: false,
   });
   const [groups, setGroups] = useState(4);
+  const [lobbyStudents, setLobbyStudents] = useState<LobbyStudent[]>([]);
+  const [socket, setSocket] = useState<Socket | null>(null);
   const [leaderboard] = useState<LeaderboardRow[]>([
     { rank: 1, team: "Team A", score: 980 },
     { rank: 2, team: "Team B", score: 870 },
@@ -38,6 +47,37 @@ export default function TeacherDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Socket connection for lobby monitoring
+  useEffect(() => {
+    const s = io("http://localhost:3000");
+    setSocket(s);
+
+    console.log("[teacher] connecting to lobby socket");
+
+    s.on("connect", () => {
+      console.log("[teacher] connected to lobby", s.id);
+      // Don't emit joinLobby for teachers - they're observers only
+    });
+
+    s.on("lobbyUpdate", (students: LobbyStudent[]) => {
+      console.log("[teacher] received lobbyUpdate", students);
+      setLobbyStudents(students);
+    });
+
+    s.on("gameStarted", (gameData: any) => {
+      console.log("[teacher] game started confirmation:", gameData);
+      // Teacher can receive confirmation but doesn't redirect
+    });
+
+    s.on("gameStartAck", (ackData: any) => {
+      console.log("[teacher] received game start acknowledgment:", ackData);
+    });
+
+    return () => {
+      s.disconnect();
+    };
+  }, []);
+
   const toggleChapter = (key: keyof typeof chapters) => {
     setChapters((prev) => ({ ...prev, [key]: !prev[key] }));
   };
@@ -49,7 +89,24 @@ export default function TeacherDashboard() {
   };
 
   const startGame = () => {
-    alert("Game started with current settings. (Static demo)");
+    console.log("[teacher] startGame clicked");
+    console.log("[teacher] socket:", socket);
+    console.log("[teacher] lobbyStudents.length:", lobbyStudents.length);
+    
+    if (socket && lobbyStudents.length > 0) {
+      console.log("[teacher] Starting game for", lobbyStudents.length, "students");
+      socket.emit("startGame", {
+        chapter: "chapter1",
+        level: "level1",
+        groups: groups,
+        enabledChapters: chapters
+      });
+      console.log("[teacher] startGame event emitted");
+      alert(`Game started! ${lobbyStudents.length} students will be redirected to Chapter 1.`);
+    } else {
+      console.log("[teacher] Cannot start game - socket:", !!socket, "students:", lobbyStudents.length);
+      alert("No students in lobby to start the game.");
+    }
   };
 
   const exportCSV = () => {
@@ -67,7 +124,7 @@ export default function TeacherDashboard() {
 
   return (
     <div style={{ padding: 32, minHeight: "100vh", background: "#0b0b0b", color: "#fff", fontFamily: "Inter, Arial, sans-serif" }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 420px", gap: 28, alignItems: "start" }}>
+      <div style={{ maxWidth: 1400, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 350px 350px", gap: 28, alignItems: "start" }}>
         <section style={{ background: "#111", padding: 28, borderRadius: 12, boxShadow: "0 6px 24px rgba(0,0,0,0.6)", border: "1px solid rgba(255,204,102,0.06)" }}>
           <h2 style={{ margin: 0, fontSize: 20, color: "#ffcc66" }}>Class Controls</h2>
           <p style={{ marginTop: 8, color: "#ddd" }}>Lock or unlock chapters and configure the game.</p>
@@ -109,6 +166,36 @@ export default function TeacherDashboard() {
             <button onClick={() => {signOut({ redirectTo: "/" })}} style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', padding: '8px 12px', borderRadius: 8, color: '#fff' }}>Logout</button>
           </div>
         </section>
+
+        <aside style={{ background: "#0f0f0f", padding: 22, borderRadius: 12, boxShadow: "0 6px 24px rgba(0,0,0,0.6)", border: "1px solid rgba(64,224,208,0.06)" }}>
+          <h3 style={{ margin: 0, color: "#40e0d0" }}>Live Lobby ({lobbyStudents.length})</h3>
+          <p style={{ color: "#ddd", fontSize: 13, marginTop: 6 }}>Students currently in the lobby.</p>
+
+          {lobbyStudents.length === 0 ? (
+            <div style={{ marginTop: 16, padding: 16, background: "rgba(255,255,255,0.02)", borderRadius: 8, textAlign: "center", color: "#888" }}>
+              No students in lobby
+            </div>
+          ) : (
+            <div style={{ marginTop: 16, maxHeight: 300, overflowY: "auto" }}>
+              {lobbyStudents.map((student) => (
+                <div key={student.id} style={{ 
+                  padding: "8px 12px", 
+                  marginBottom: 8, 
+                  background: "rgba(64,224,208,0.08)", 
+                  borderRadius: 8, 
+                  border: "1px solid rgba(64,224,208,0.15)" 
+                }}>
+                  <div style={{ color: "#40e0d0", fontWeight: 600, fontSize: 14 }}>{student.name}</div>
+                  <div style={{ color: "#aaa", fontSize: 12 }}>Section {student.section} • ID: {student.id.slice(-4)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ marginTop: 16, padding: "8px 12px", background: "rgba(64,224,208,0.04)", borderRadius: 6, fontSize: 12, color: "#40e0d0" }}>
+            🔄 Updates in real-time
+          </div>
+        </aside>
 
         <aside style={{ background: "#0f0f0f", padding: 22, borderRadius: 12, boxShadow: "0 6px 24px rgba(0,0,0,0.6)", border: "1px solid rgba(255,204,102,0.04)" }}>
           <h3 style={{ margin: 0, color: "#ffcc66" }}>Leaderboard (static)</h3>

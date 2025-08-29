@@ -14,7 +14,7 @@ export default function StudentLobby() {
   const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
-  const s = io("http://localhost:3000");
+    const s = io("http://localhost:3000");
     setSocket(s);
 
     console.log("[lobby] attempting socket connect to http://localhost:3000");
@@ -33,14 +33,40 @@ export default function StudentLobby() {
       setStudents(data);
     });
 
+    s.on("testEvent", (data: any) => {
+      console.log("[lobby] 📡 TEST EVENT RECEIVED:", data);
+    });
+
+    s.on("gameStarted", (gameData: any) => {
+      console.log("[lobby] 🎮 GAME STARTED EVENT RECEIVED!", gameData);
+      const redirectPath = `/game/${gameData.chapter || "chapter1"}`;
+      console.log("[lobby] Redirecting to:", redirectPath);
+      
+      // Add a small delay to ensure the log is visible
+      setTimeout(() => {
+        console.log("[lobby] Executing router.push to:", redirectPath);
+        router.push(redirectPath);
+      }, 100);
+    });
+
     s.on("joined", (payload: any) => {
       console.log("[lobby] joined ack:", payload);
     });
 
+    // Add error handling
+    s.on("connect_error", (error: any) => {
+      console.error("[lobby] Connection error:", error);
+    });
+
+    s.on("disconnect", (reason: any) => {
+      console.log("[lobby] Disconnected:", reason);
+    });
+
     return () => {
+      console.log("[lobby] Cleaning up socket connection");
       s.disconnect();
     };
-  }, []);
+  }, [router]);
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8f8f8", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 0" }}>
