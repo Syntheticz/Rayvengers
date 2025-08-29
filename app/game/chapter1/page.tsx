@@ -5,11 +5,10 @@ import { useRouter } from "next/navigation";
 export default function Chapter1Overview() {
   const router = useRouter();
 
-  // Auto-redirect to level 1 after a brief display
   useEffect(() => {
     const timer = setTimeout(() => {
       router.push("/game/chapter1/level1");
-    }, 3000); // 3 second delay to show the overview
+    }, 5000); 
 
     return () => clearTimeout(timer);
   }, [router]);
