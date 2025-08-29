@@ -35,7 +35,7 @@ export default function Chapter1Overview() {
         textAlign: "center",
         textShadow: "2px 2px 4px rgba(0,0,0,0.5)"
       }}>
-        learner's interface
+        learner&#39;s interface
       </h1>
 
       {/* Chapters Display */}
