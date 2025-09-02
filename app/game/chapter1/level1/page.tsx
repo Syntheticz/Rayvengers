@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { io, Socket } from "socket.io-client";
+import { io } from "socket.io-client";
 import Image from "next/image";
 
 interface Question {
@@ -27,15 +27,10 @@ export default function Chapter1Level1() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session");
 
-  const [socket, setSocket] = useState<Socket | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [questionStates, setQuestionStates] = useState<
     Record<string, QuestionState>
   >({});
-  const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(
-    null
-  );
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,7 +40,6 @@ export default function Chapter1Level1() {
     // }
 
     const s = io("http://localhost:3000");
-    setSocket(s);
 
     s.on("connect", () => {
       console.log("[game] Connected to game server");
@@ -67,9 +61,7 @@ export default function Chapter1Level1() {
 
     s.on("answerResult", (data: { questionId: string; isCorrect: boolean }) => {
       console.log("[game] Answer result:", data);
-      alert(`${data.isCorrect ? "🎉 Correct!" : "❌ Wrong!"}`);
-      setSelectedQuestion(null);
-      setSelectedAnswer(null);
+      // Results are now handled in individual chest pages
     });
 
     s.on("gameCompleted", (data) => {
@@ -95,25 +87,15 @@ export default function Chapter1Level1() {
     router.push("/student/lobby");
   };
 
-  const handleClaimQuestion = (question: Question) => {
-    if (!socket || !sessionId) return;
+  const handleClaimQuestion = (question: Question, index: number) => {
+    if (!sessionId) return;
 
     const state = questionStates[question.id];
     if (state?.status !== "available") return;
 
-    socket.emit("claimQuestion", { sessionId, questionId: question.id });
-    setSelectedQuestion(question);
-  };
-
-  const handleSubmitAnswer = () => {
-    if (!socket || !sessionId || !selectedQuestion || selectedAnswer === null)
-      return;
-
-    socket.emit("submitAnswer", {
-      sessionId,
-      questionId: selectedQuestion.id,
-      answer: selectedAnswer,
-    });
+    // Navigate to the individual chest page
+    const chestNumber = index + 1;
+    router.push(`/game/chapter1/level1/${chestNumber}?session=${sessionId}`);
   };
 
   const getQuestionStatusColor = (state: QuestionState | undefined) => {
@@ -228,20 +210,19 @@ export default function Chapter1Level1() {
         Level 1 – The Light Seeker
       </h1>
 
-      {!selectedQuestion ? (
-        /* Treasure Chest Selection View */
-        <div style={{ maxWidth: "800px", margin: "0 auto" }}>
-          <h2
-            style={{
-              color: "#fff",
-              textAlign: "center",
-              marginBottom: "30px",
-              fontSize: "clamp(1rem, 4vw, 1.5rem)",
-              fontFamily: "'Press Start 2P', cursive",
-            }}
-          >
-            Choose Your Treasure Chest
-          </h2>
+      {/* Treasure Chest Selection View */}
+      <div style={{ maxWidth: "800px", margin: "0 auto" }}>
+        <h2
+          style={{
+            color: "#fff",
+            textAlign: "center",
+            marginBottom: "30px",
+            fontSize: "clamp(1rem, 4vw, 1.5rem)",
+            fontFamily: "'Press Start 2P', cursive",
+          }}
+        >
+          Choose Your Treasure Chest
+        </h2>
 
           <div
             style={{
@@ -260,7 +241,7 @@ export default function Chapter1Level1() {
               return (
                 <div
                   key={question.id}
-                  onClick={() => isAvailable && handleClaimQuestion(question)}
+                  onClick={() => isAvailable && handleClaimQuestion(question, index)}
                   style={{
                     cursor: isAvailable ? "pointer" : "not-allowed",
                     textAlign: "center",
@@ -471,126 +452,6 @@ export default function Chapter1Level1() {
             </p>
           </div>
         </div>
-      ) : (
-        /* Question Answering View */
-        <div style={{ maxWidth: "600px", margin: "0 auto" }}>
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: "16px",
-              padding: "24px",
-              boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
-            }}
-          >
-            <div
-              style={{
-                textAlign: "center",
-                marginBottom: "20px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "24px",
-                  marginBottom: "8px",
-                }}
-              >
-                📜
-              </div>
-              <h3
-                style={{
-                  color: "#b80f2c",
-                  fontSize: "18px",
-                  margin: 0,
-                  fontFamily: "'Press Start 2P', cursive",
-                }}
-              >
-                Ancient Riddle
-              </h3>
-            </div>
-
-            <p
-              style={{
-                color: "#333",
-                fontSize: "16px",
-                lineHeight: "1.5",
-                textAlign: "center",
-                marginBottom: "24px",
-                fontStyle: "italic",
-              }}
-            >
-              {selectedQuestion.text}
-            </p>
-
-            <div style={{ display: "grid", gap: "12px" }}>
-              {selectedQuestion.options.map((option, index) => (
-                <button
-                  key={index}
-                  onClick={() => setSelectedAnswer(index)}
-                  style={{
-                    background:
-                      selectedAnswer === index ? "#ffcc66" : "#f5f5f5",
-                    border: `2px solid ${
-                      selectedAnswer === index ? "#b80f2c" : "#ddd"
-                    }`,
-                    borderRadius: "8px",
-                    padding: "12px 16px",
-                    cursor: "pointer",
-                    fontSize: "14px",
-                    textAlign: "left",
-                    transition: "all 0.2s ease",
-                    fontWeight: selectedAnswer === index ? "bold" : "normal",
-                  }}
-                >
-                  {String.fromCharCode(65 + index)}. {option}
-                </button>
-              ))}
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                gap: "12px",
-                marginTop: "24px",
-                justifyContent: "space-between",
-              }}
-            >
-              <button
-                onClick={() => {
-                  setSelectedQuestion(null);
-                  setSelectedAnswer(null);
-                }}
-                style={{
-                  background: "#666",
-                  color: "#fff",
-                  border: "none",
-                  padding: "12px 24px",
-                  borderRadius: "8px",
-                  cursor: "pointer",
-                  fontWeight: "bold",
-                }}
-              >
-                Back to Chests
-              </button>
-
-              <button
-                onClick={handleSubmitAnswer}
-                disabled={selectedAnswer === null}
-                style={{
-                  background: selectedAnswer !== null ? "#b80f2c" : "#ccc",
-                  color: "#fff",
-                  border: "none",
-                  padding: "12px 24px",
-                  borderRadius: "8px",
-                  cursor: selectedAnswer !== null ? "pointer" : "not-allowed",
-                  fontWeight: "bold",
-                }}
-              >
-                Open Chest! 🗝️
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <style jsx>{`
         @keyframes spin {
