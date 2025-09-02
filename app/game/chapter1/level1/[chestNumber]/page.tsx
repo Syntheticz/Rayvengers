@@ -26,7 +26,6 @@ export default function ChestQuestionPage() {
 
     s.on("connect", () => {
       console.log(`[chest${chestNumber}] Connected to server`);
-      // Request question data for this specific chest
       s.emit("getChestQuestion", { sessionId, chestNumber });
     });
 
@@ -47,15 +46,13 @@ export default function ChestQuestionPage() {
 
   const handleSubmitAnswer = () => {
     if (!socket || !sessionId || !selectedElement) return;
-    
-    // Submit the selected element as the answer
+
     socket.emit("submitChestAnswer", {
       sessionId,
       chestNumber,
       answer: selectedElement
     });
     
-    // Go back to level view
     router.push(`/game/chapter1/level1?session=${sessionId}`);
   };
 
