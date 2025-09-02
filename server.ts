@@ -94,30 +94,32 @@ app.prepare().then(() => {
 
   io.use(async (socket, next) => {
     try {
-      // create a fake request object for getToken
       const req = {
         headers: socket.handshake.headers,
         cookies: parse(socket.handshake.headers.cookie || ""),
       } as any;
+
+      console.log("🍪 Cookies received:", req.cookies);
 
       const token = await getToken({
         req,
         secret: process.env.AUTH_SECRET,
       });
 
+      console.log("🔑 Decoded token:", token);
+
       if (!token) {
         return next(new Error("Unauthorized: no session token"));
       }
 
-      // attach user to socket
       (socket as any).user = {
         id: token.id,
         role: token.role,
         name: token.name,
         section: token.section,
+        username: token.username,
       };
 
-      console.log("✅ Authenticated socket user:", token.name);
       next();
     } catch (err) {
       console.error("❌ Socket auth failed", err);
@@ -128,7 +130,7 @@ app.prepare().then(() => {
   io.on("connection", (socket) => {
     const user = (socket as any).user;
     console.log(`🔌 Connected: ${user.name} (${user.role})`);
-    console.log(user);
+    // console.log(user);
 
     socket.emit("lobbyUpdate", Object.values(lobby));
 
@@ -141,7 +143,7 @@ app.prepare().then(() => {
 
         console.log("received joinLobby from", socket.id, "payload:", payload);
         lobby[socket.id] = {
-          id: socket.id,
+          id: user.id,
           name: name,
           section: section,
         };

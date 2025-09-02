@@ -1,4 +1,4 @@
-"use client"
+"use client";
 import Slider from "@/components/slider";
 import HeroGuide1 from "@/components/slides/HeroGuide1";
 import HeroGuide2 from "@/components/slides/HeroGuide2";
@@ -18,17 +18,41 @@ export default function StudentGuide() {
     <HeroGuide3 key="guide3" />,
     <HeroGuide4 key="guide4" />,
     <HeroGuide5 key="guide5" />,
-    <HeroGuide6 key="guide6" />
+    <HeroGuide6 key="guide6" />,
   ];
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center w-screen" style={{ position: "relative", paddingTop: "72px"}}>
+    <main
+      className="min-h-screen flex flex-col items-center justify-center w-screen"
+      style={{ position: "relative", paddingTop: "72px" }}
+    >
       <button
-        onClick={() => { signOut({ redirectTo: "/" }) }}
-        style={{ position: "absolute", top: 24, right: 32, background: "#b80f2c", color: "#ffcc66", border: "none", borderRadius: 8, padding: "10px 18px", fontWeight: 700, fontFamily: "Bangers, cursive", fontSize: "1.1rem", cursor: "pointer", zIndex: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}
+        onClick={() => {
+          signOut();
+          router.push("/");
+        }}
+        style={{
+          position: "absolute",
+          top: 24,
+          right: 32,
+          background: "#b80f2c",
+          color: "#ffcc66",
+          border: "none",
+          borderRadius: 8,
+          padding: "10px 18px",
+          fontWeight: 700,
+          fontFamily: "Bangers, cursive",
+          fontSize: "1.1rem",
+          cursor: "pointer",
+          zIndex: 10,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+        }}
       >
         Logout
       </button>
-  <Slider slides={slides} onLastNext={() => router.push("/student/lobby")} />
+      <Slider
+        slides={slides}
+        onLastNext={() => router.push("/student/lobby")}
+      />
     </main>
   );
 }

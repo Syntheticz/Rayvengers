@@ -21,11 +21,15 @@ export default function StudentLobby() {
 
     s.on("connect", () => {
       console.log("[lobby] connected", s.id);
-      s.emit("joinLobby", {
-        socketId: s.id
-      }, (ackPayload: any) => {
-        console.log("[lobby] joinLobby ack:", ackPayload);
-      });
+      s.emit(
+        "joinLobby",
+        {
+          socketId: s.id,
+        },
+        (ackPayload: any) => {
+          console.log("[lobby] joinLobby ack:", ackPayload);
+        }
+      );
     });
 
     s.on("lobbyUpdate", (data: Student[]) => {
@@ -39,12 +43,9 @@ export default function StudentLobby() {
 
     s.on("gameStarted", (gameData: any) => {
       console.log("[lobby] 🎮 GAME STARTED EVENT RECEIVED!", gameData);
-      const redirectPath = gameData.sessionId 
-        ? `/game/${gameData.chapter || "chapter1"}?session=${gameData.sessionId}`
-        : `/game/${gameData.chapter || "chapter1"}`;
+      const redirectPath = `/game/${gameData.chapter || "chapter1"}`;
       console.log("[lobby] Redirecting to:", redirectPath);
-      console.log("[lobby] Session ID from gameData:", gameData.sessionId);
-      
+
       // Add a small delay to ensure the log is visible
       setTimeout(() => {
         console.log("[lobby] Executing router.push to:", redirectPath);
@@ -72,15 +73,65 @@ export default function StudentLobby() {
   }, [router]);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f8f8f8", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 0" }}>
-      <h1 style={{ fontFamily: "Bangers, cursive", color: "#b80f2c", fontSize: "2.2rem", fontWeight: "bold", marginBottom: "18px", letterSpacing: "2px", textAlign: "center" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#f8f8f8",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "32px 0",
+      }}
+    >
+      <h1
+        style={{
+          fontFamily: "Bangers, cursive",
+          color: "#b80f2c",
+          fontSize: "2.2rem",
+          fontWeight: "bold",
+          marginBottom: "18px",
+          letterSpacing: "2px",
+          textAlign: "center",
+        }}
+      >
         Game Lobby
       </h1>
-      <div style={{ background: "#fff", borderRadius: "18px", boxShadow: "0 4px 16px rgba(0,0,0,0.10)", padding: "24px 32px", minWidth: "260px", maxWidth: "340px", width: "100%", marginBottom: "24px" }}>
-        <h2 style={{ fontFamily: "'Press Start 2P', cursive", color: "#b80f2c", fontSize: "1.1rem", marginBottom: "12px", textAlign: "center" }}>Students in Lobby</h2>
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: "18px",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
+          padding: "24px 32px",
+          minWidth: "260px",
+          maxWidth: "340px",
+          width: "100%",
+          marginBottom: "24px",
+        }}
+      >
+        <h2
+          style={{
+            fontFamily: "'Press Start 2P', cursive",
+            color: "#b80f2c",
+            fontSize: "1.1rem",
+            marginBottom: "12px",
+            textAlign: "center",
+          }}
+        >
+          Students in Lobby
+        </h2>
         <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
           {students.map((s, i) => (
-            <li key={i} style={{ fontFamily: "'Press Start 2P', cursive", color: "#333", fontSize: "1rem", marginBottom: "8px", textAlign: "center" }}>
+            <li
+              key={i}
+              style={{
+                fontFamily: "'Press Start 2P', cursive",
+                color: "#333",
+                fontSize: "1rem",
+                marginBottom: "8px",
+                textAlign: "center",
+              }}
+            >
               {s.name} <span style={{ color: "#b80f2c" }}>[{s.section}]</span>
             </li>
           ))}
@@ -88,7 +139,18 @@ export default function StudentLobby() {
       </div>
       <button
         onClick={() => router.push("/student/guide")}
-        style={{ background: "#b80f2c", color: "#ffcc66", border: "none", borderRadius: 8, padding: "12px 28px", fontWeight: 700, fontFamily: "Bangers, cursive", fontSize: "1.1rem", cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}
+        style={{
+          background: "#b80f2c",
+          color: "#ffcc66",
+          border: "none",
+          borderRadius: 8,
+          padding: "12px 28px",
+          fontWeight: 700,
+          fontFamily: "Bangers, cursive",
+          fontSize: "1.1rem",
+          cursor: "pointer",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+        }}
       >
         Back
       </button>

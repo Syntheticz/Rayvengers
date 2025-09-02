@@ -35,8 +35,10 @@ export default function StudentAuth() {
       signIn("credentials", {
         email: data.email,
         password: data.password,
-        redirectTo: "/student/guide",
+        redirect: false,
       });
+
+      router.push("/student/guide");
     }
   };
 
