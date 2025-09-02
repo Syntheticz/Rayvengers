@@ -18,6 +18,7 @@ export async function fetchUserRole(id: string) {
       name: true,
       firstname: true,
       lastname: true,
+      section: true,
       role: true,
     },
   });
@@ -71,6 +72,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 id: dbUser.id,
                 name: dbUser.name,
                 email: dbUser.email,
+                section: dbUser.section,
               };
             }
           }
@@ -102,6 +104,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (dbUser) {
           token.name = dbUser.user.name;
+          token.section = dbUser.user.section;
           token.role = dbUser.user.role || "";
           token.id = dbUser.user.id || "";
         }
@@ -115,6 +118,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.name = token.name;
         session.user.role = token.role;
         session.user.id = token.id;
+        session.user.section = token.section;
       }
       return session;
     },
