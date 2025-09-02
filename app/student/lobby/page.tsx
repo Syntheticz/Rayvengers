@@ -39,8 +39,11 @@ export default function StudentLobby() {
 
     s.on("gameStarted", (gameData: any) => {
       console.log("[lobby] 🎮 GAME STARTED EVENT RECEIVED!", gameData);
-      const redirectPath = `/game/${gameData.chapter || "chapter1"}`;
+      const redirectPath = gameData.sessionId 
+        ? `/game/${gameData.chapter || "chapter1"}?session=${gameData.sessionId}`
+        : `/game/${gameData.chapter || "chapter1"}`;
       console.log("[lobby] Redirecting to:", redirectPath);
+      console.log("[lobby] Session ID from gameData:", gameData.sessionId);
       
       // Add a small delay to ensure the log is visible
       setTimeout(() => {

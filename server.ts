@@ -18,6 +18,70 @@ interface LobbyStudent {
   section: string;
 }
 
+interface Question {
+  id: string;
+  text: string;
+  options: string[];
+  correctAnswer: number;
+  points: number;
+}
+
+interface QuestionState {
+  id: string;
+  status: 'available' | 'claimed' | 'completed';
+  claimedBy?: string; // student socket ID
+  claimedByName?: string; // student name
+  answer?: number;
+  isCorrect?: boolean;
+  completedAt?: Date;
+}
+
+interface GameSession {
+  id: string;
+  chapter: string;
+  level: string;
+  students: string[]; // socket IDs
+  questions: Question[];
+  questionStates: Record<string, QuestionState>; // questionId -> state
+  startedAt: Date;
+  isActive: boolean;
+}
+
+// Store active game sessions
+const gameSessions: Record<string, GameSession> = {};
+
+// Sample questions for Chapter 1 Level 1
+const chapter1Level1Questions: Question[] = [
+  {
+    id: "c1l1q1",
+    text: "When light travels from air into water, what happens to its speed?",
+    options: ["Increases", "Decreases", "Stays the same", "Becomes zero"],
+    correctAnswer: 1,
+    points: 10
+  },
+  {
+    id: "c1l1q2", 
+    text: "What is the unit of measurement for the frequency of light?",
+    options: ["Meters", "Hertz", "Joules", "Watts"],
+    correctAnswer: 1,
+    points: 10
+  },
+  {
+    id: "c1l1q3",
+    text: "Which color of light has the shortest wavelength?",
+    options: ["Red", "Green", "Blue", "Violet"],
+    correctAnswer: 3,
+    points: 10
+  },
+  {
+    id: "c1l1q4",
+    text: "What phenomenon occurs when light bends as it passes through a lens?",
+    options: ["Reflection", "Refraction", "Diffraction", "Interference"],
+    correctAnswer: 1,
+    points: 10
+  }
+];
+
 const lobby: Record<string, LobbyStudent> = {};
 
 app.prepare().then(() => {
@@ -74,12 +138,43 @@ app.prepare().then(() => {
       console.log("📊 Current lobby students:", Object.keys(lobby));
       console.log("🔗 Total connected clients:", io.engine.clientsCount);
       
+      // Create new game session
+      const sessionId = `game_${Date.now()}`;
+      const lobbyStudents = Object.keys(lobby);
+      
+      if (lobbyStudents.length === 0) {
+        socket.emit("gameStartError", { message: "No students in lobby" });
+        return;
+      }
+
+      // Initialize question states
+      const questionStates: Record<string, QuestionState> = {};
+      chapter1Level1Questions.forEach(q => {
+        questionStates[q.id] = {
+          id: q.id,
+          status: 'available'
+        };
+      });
+
+      // Create game session
+      gameSessions[sessionId] = {
+        id: sessionId,
+        chapter: gameData.chapter || "chapter1",
+        level: gameData.level || "level1", 
+        students: lobbyStudents,
+        questions: chapter1Level1Questions,
+        questionStates,
+        startedAt: new Date(),
+        isActive: true
+      };
+
       // First send a test event to check if students receive it
       io.emit("testEvent", { message: "Test event from server" });
       console.log("📤 Sent testEvent to all clients");
       
       // Notify all students in lobby to start the game
       const gameStartData = {
+        sessionId,
         chapter: gameData.chapter || "chapter1",
         level: gameData.level || "level1",
         message: "Game is starting! Get ready..."
@@ -90,9 +185,133 @@ app.prepare().then(() => {
       
       // Send acknowledgment back to teacher
       socket.emit("gameStartAck", {
-        studentsNotified: Object.keys(lobby).length,
+        sessionId,
+        studentsNotified: lobbyStudents.length,
         totalClients: io.engine.clientsCount
       });
+    });
+
+    // Handle student requesting questions list
+    socket.on("getQuestions", (data) => {
+      const { sessionId } = data;
+      const session = gameSessions[sessionId];
+      
+      if (!session || !session.isActive) {
+        socket.emit("questionsError", { message: "Game session not found" });
+        return;
+      }
+
+      // Send questions with current states
+      socket.emit("questionsUpdate", {
+        questions: session.questions,
+        questionStates: session.questionStates
+      });
+    });
+
+    // Handle student claiming a question
+    socket.on("claimQuestion", (data) => {
+      const { sessionId, questionId } = data;
+      const session = gameSessions[sessionId];
+      
+      if (!session || !session.isActive) {
+        socket.emit("claimError", { message: "Game session not found" });
+        return;
+      }
+
+      const questionState = session.questionStates[questionId];
+      if (!questionState || questionState.status !== 'available') {
+        socket.emit("claimError", { message: "Question not available" });
+        return;
+      }
+
+      // Claim the question
+      questionState.status = 'claimed';
+      questionState.claimedBy = socket.id;
+      questionState.claimedByName = lobby[socket.id]?.name || `Student-${socket.id.slice(-4)}`;
+
+      // Broadcast updated state to all students in the session
+      session.students.forEach(studentId => {
+        const studentSocket = io.sockets.sockets.get(studentId);
+        if (studentSocket) {
+          studentSocket.emit("questionsUpdate", {
+            questions: session.questions,
+            questionStates: session.questionStates
+          });
+        }
+      });
+
+      console.log(`📝 Question ${questionId} claimed by ${questionState.claimedByName}`);
+    });
+
+    // Handle student submitting answer
+    socket.on("submitAnswer", (data) => {
+      const { sessionId, questionId, answer } = data;
+      const session = gameSessions[sessionId];
+      
+      if (!session || !session.isActive) {
+        socket.emit("submitError", { message: "Game session not found" });
+        return;
+      }
+
+      const questionState = session.questionStates[questionId];
+      if (!questionState || questionState.claimedBy !== socket.id) {
+        socket.emit("submitError", { message: "Question not claimed by you" });
+        return;
+      }
+
+      const question = session.questions.find(q => q.id === questionId);
+      if (!question) {
+        socket.emit("submitError", { message: "Question not found" });
+        return;
+      }
+
+      // Process the answer
+      const isCorrect = answer === question.correctAnswer;
+      questionState.status = 'completed';
+      questionState.answer = answer;
+      questionState.isCorrect = isCorrect;
+      questionState.completedAt = new Date();
+
+      // Broadcast updated state to all students
+      session.students.forEach(studentId => {
+        const studentSocket = io.sockets.sockets.get(studentId);
+        if (studentSocket) {
+          studentSocket.emit("questionsUpdate", {
+            questions: session.questions,
+            questionStates: session.questionStates
+          });
+        }
+      });
+
+      // Send individual result to the student
+      socket.emit("answerResult", {
+        questionId,
+        isCorrect,
+        points: isCorrect ? question.points : 0,
+        correctAnswer: question.correctAnswer
+      });
+
+      console.log(`✅ Question ${questionId} completed by ${questionState.claimedByName} - ${isCorrect ? 'Correct' : 'Wrong'}`);
+
+      // Check if all questions are completed
+      const allCompleted = Object.values(session.questionStates).every(
+        qs => qs.status === 'completed'
+      );
+
+      if (allCompleted) {
+        // Game completed, send results
+        session.isActive = false;
+        session.students.forEach(studentId => {
+          const studentSocket = io.sockets.sockets.get(studentId);
+          if (studentSocket) {
+            studentSocket.emit("gameCompleted", {
+              sessionId,
+              results: session.questionStates
+            });
+          }
+        });
+        console.log(`🎉 Game session ${sessionId} completed!`);
+      }
     });
 
     // When player disconnects
