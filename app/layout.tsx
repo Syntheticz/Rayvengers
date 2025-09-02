@@ -1,32 +1,54 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import {
+  Geist,
+  Geist_Mono,
+  Anton,
+  Bangers,
+  Press_Start_2P,
+} from "next/font/google";
 import "./globals.css";
+import { SocketProvider } from "@/lib/providers/socket-provider";
+
+// Load fonts via next/font (auto-optimized, no FOUT, no extra <link> tags)
+const geist = Geist({
+  subsets: ["latin"],
+  variable: "--font-geist",
+});
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-geist-mono",
+});
+const anton = Anton({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-anton",
+});
+const bangers = Bangers({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-bangers",
+});
+const pressStart2P = Press_Start_2P({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-press-start-2p",
+});
 
 export const metadata: Metadata = {
   title: "Ravengers",
-  description: "Gamefied App",
+  description: "Gamified App",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Anton:wght@400&family=Bangers&family=Press+Start+2P&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className={`antialiased`}>{children}</body>
+      <body
+        className={`${geist.variable} ${geistMono.variable} ${anton.variable} ${bangers.variable} ${pressStart2P.variable} antialiased`}
+      >
+        <SocketProvider>{children}</SocketProvider>
+      </body>
     </html>
   );
 }

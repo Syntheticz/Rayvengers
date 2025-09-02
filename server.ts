@@ -106,8 +106,6 @@ app.prepare().then(() => {
         secret: process.env.AUTH_SECRET,
       });
 
-      console.log("🔑 Decoded token:", token);
-
       if (!token) {
         return next(new Error("Unauthorized: no session token"));
       }

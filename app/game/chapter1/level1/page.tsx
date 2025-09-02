@@ -39,10 +39,10 @@ export default function Chapter1Level1() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!sessionId) {
-      router.push("/student/lobby");
-      return;
-    }
+    // if (!sessionId) {
+    //   router.push("/student/lobby");
+    //   return;
+    // }
 
     const s = io("http://localhost:3000");
     setSocket(s);
