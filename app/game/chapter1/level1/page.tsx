@@ -2,13 +2,13 @@
 import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { io, Socket } from "socket.io-client";
+import Image from "next/image";
 
 interface Question {
   id: string;
-  text: string;
+  question: string;
   options: string[];
   correctAnswer: number;
-  points: number;
 }
 
 interface QuestionState {
@@ -54,9 +54,9 @@ export default function Chapter1Level1() {
       setLoading(false);
     });
 
-    s.on("answerResult", (data: { questionId: string, isCorrect: boolean, points: number }) => {
+    s.on("answerResult", (data: { questionId: string, isCorrect: boolean }) => {
       console.log("[game] Answer result:", data);
-      alert(`${data.isCorrect ? '🎉 Correct!' : '❌ Wrong!'} Points: ${data.points}`);
+      alert(`${data.isCorrect ? '🎉 Correct!' : '❌ Wrong!'}`);
       setSelectedQuestion(null);
       setSelectedAnswer(null);
     });
@@ -239,10 +239,11 @@ export default function Chapter1Level1() {
                     position: "relative",
                     cursor: isAvailable ? "pointer" : "not-allowed"
                   }}>
-                    {/* Chest Image */}
-                    <img 
+                    <Image
                       src="/chest.png"
                       alt="Treasure Chest"
+                      width={120}
+                      height={120}
                       style={{
                         width: "100%",
                         height: "100%",
@@ -256,6 +257,7 @@ export default function Chapter1Level1() {
                           : "grayscale(70%) opacity(0.6)",
                         transition: "all 0.3s ease"
                       }}
+                      priority
                     />
 
                     {/* Status Overlay */}
@@ -377,19 +379,6 @@ export default function Chapter1Level1() {
                     }}>
                       {getQuestionStatusText(state)}
                     </div>
-                    
-                    <div style={{ 
-                      color: "#ffcc66", 
-                      background: "#b80f2c",
-                      fontSize: "10px",
-                      fontWeight: "bold",
-                      padding: "2px 6px",
-                      borderRadius: "4px",
-                      marginTop: "4px",
-                      display: "inline-block"
-                    }}>
-                      {question.points} pts
-                    </div>
                   </div>
                 </div>
               );
@@ -406,10 +395,10 @@ export default function Chapter1Level1() {
             margin: "40px auto 0"
           }}>
             <p style={{ margin: "0 0 8px 0" }}>
-              🏆 <strong>Choose a treasure chest to reveal a physics question!</strong>
+               <strong>Choose a treasure chest to reveal your question!</strong>
             </p>
             <p style={{ margin: 0, fontSize: "12px" }}>
-              Once claimed, other students can't pick the same chest. Answer correctly to earn treasure points!
+              Once claimed, other students can&apos;t pick the same chest. Answer correctly to unlock the treasure!
             </p>
           </div>
         </div>
