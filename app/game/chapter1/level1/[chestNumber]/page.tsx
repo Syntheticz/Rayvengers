@@ -1,23 +1,61 @@
 "use client";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import React, { useState, useEffect } from "react";
 import { io, Socket } from "socket.io-client";
+
+interface Question {
+  id: string;
+  question: string;
+  description: string;
+  target: string;
+  explanation: string;
+}
+
+const CHEST_QUESTIONS: Record<string, Question> = {
+  "1": { 
+    id: "chest1", 
+    question: "Concave Mirror - Focal Point", 
+    description: "Click on the focal point (F) in the diagram",
+    target: "focal-point",
+    explanation: "The focal point is where parallel light rays converge after reflecting from the concave mirror."
+  },
+  "2": { 
+    id: "chest2", 
+    question: "Concave Mirror - Center of Curvature", 
+    description: "Click on the center of curvature (C) in the diagram",
+    target: "center-curvature",
+    explanation: "The center of curvature is the center of the sphere that the mirror is a part of."
+  },
+  "3": { 
+    id: "chest3", 
+    question: "Concave Mirror - Principal Axis", 
+    description: "Click on the principal axis in the diagram",
+    target: "principal-axis",
+    explanation: "The principal axis is the line passing through the center of curvature and the vertex of the mirror."
+  },
+  "4": { 
+    id: "chest4", 
+    question: "Concave Mirror - Mirror Surface", 
+    description: "Click on the concave mirror surface in the diagram",
+    target: "concave-mirror",
+    explanation: "The concave mirror surface is the curved reflective surface that converges light rays."
+  }
+};
 
 export default function ChestQuestionPage() {
   const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const chestNumber = params.chestNumber as string;
-  const sessionId = searchParams.get('session');
   
   const [socket, setSocket] = useState<Socket | null>(null);
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
-  const [questionData, setQuestionData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
+  
+  const questionData = CHEST_QUESTIONS[chestNumber];
 
   useEffect(() => {
-    if (!sessionId) {
-      router.push('/student/lobby');
+    if (!questionData) {
+      router.push("/game/chapter1/level1");
       return;
     }
 
@@ -25,38 +63,102 @@ export default function ChestQuestionPage() {
     setSocket(s);
 
     s.on("connect", () => {
-      console.log(`[chest${chestNumber}] Connected to server`);
-      s.emit("getChestQuestion", { sessionId, chestNumber });
-    });
-
-    s.on("chestQuestion", (data) => {
-      console.log(`[chest${chestNumber}] Received question:`, data);
-      setQuestionData(data);
-      setLoading(false);
+      console.log(`Connected to server for chest ${chestNumber}`);
+      const questionId = `chest${chestNumber}`;
+      s.emit("claimQuestion", { questionId });
+      setLoading(false); 
     });
 
     return () => {
       s.disconnect();
     };
-  }, [sessionId, chestNumber, router]);
+  }, [chestNumber, questionData, router]);
 
   const handleElementClick = (elementType: string) => {
     setSelectedElement(elementType);
   };
 
   const handleSubmitAnswer = () => {
-    if (!socket || !sessionId || !selectedElement) return;
-
-    socket.emit("submitChestAnswer", {
-      sessionId,
-      chestNumber,
+    if (!socket || !selectedElement) return;
+    
+    const questionId = `chest${chestNumber}`;
+    socket.emit("submitAnswer", {
+      questionId,
       answer: selectedElement
     });
     
-    router.push(`/game/chapter1/level1?session=${sessionId}`);
+    router.push("/game/chapter1/level1");
   };
 
-  if (loading) {
+  const getChestContent = () => {
+    if (!questionData) return null;
+
+    const baseStyle = {
+      background: "#f8f9fa", 
+      borderRadius: "12px", 
+      padding: "20px",
+      marginBottom: "20px"
+    };
+
+    const svgStyle = { 
+      border: "2px solid #e0e0e0", 
+      borderRadius: "8px", 
+      background: "#fff" 
+    };
+
+    return (
+      <div style={baseStyle}>
+        <svg width="100%" height="300" viewBox="0 0 600 250" style={svgStyle}>
+          {/* Principal Axis */}
+          <line 
+            x1="50" y1="125" x2="450" y2="125" 
+            stroke={selectedElement === 'principal-axis' ? "#e74c3c" : "#000"}
+            strokeWidth={selectedElement === 'principal-axis' ? "4" : "2"}
+            onClick={() => handleElementClick('principal-axis')}
+            style={{ cursor: 'pointer' }}
+          />
+          
+          {/* Center of Curvature */}
+          <circle 
+            cx="200" cy="125" r="6" 
+            fill={selectedElement === 'center-curvature' ? "#e74c3c" : "#000"}
+            onClick={() => handleElementClick('center-curvature')}
+            style={{ cursor: 'pointer' }}
+          />
+          
+          {/* Focal Point */}
+          <circle 
+            cx="300" cy="125" r="6" 
+            fill={selectedElement === 'focal-point' ? "#e74c3c" : "#000"}
+            onClick={() => handleElementClick('focal-point')}
+            style={{ cursor: 'pointer' }}
+          />
+          
+          {/* Concave Mirror */}
+          <path 
+            d="M 450 50 Q 480 125 450 200" 
+            stroke={selectedElement === 'concave-mirror' ? "#e74c3c" : "#87CEEB"}
+            strokeWidth={selectedElement === 'concave-mirror' ? "12" : "8"}
+            fill="#B0E0E6"
+            fillOpacity="0.7"
+            onClick={() => handleElementClick('concave-mirror')}
+            style={{ cursor: 'pointer' }}
+          />
+          
+          {/* Reflection lines */}
+          <line x1="455" y1="60" x2="460" y2="55" stroke="#000" strokeWidth="1" />
+          <line x1="455" y1="80" x2="460" y2="75" stroke="#000" strokeWidth="1" />
+          <line x1="455" y1="100" x2="460" y2="95" stroke="#000" strokeWidth="1" />
+          <line x1="455" y1="125" x2="460" y2="120" stroke="#000" strokeWidth="1" />
+          <line x1="455" y1="150" x2="460" y2="155" stroke="#000" strokeWidth="1" />
+          <line x1="455" y1="170" x2="460" y2="175" stroke="#000" strokeWidth="1" />
+          <line x1="455" y1="190" x2="460" y2="195" stroke="#000" strokeWidth="1" />
+        </svg>
+      </div>
+    );
+  };
+
+  if (loading || !questionData) {
     return (
       <div style={{
         minHeight: "100vh",
@@ -65,12 +167,14 @@ export default function ChestQuestionPage() {
         alignItems: "center",
         justifyContent: "center",
         color: "#fff",
-        fontFamily: "'Press Start 2P', cursive"
+        fontSize: "1.2rem"
       }}>
-        Loading Treasure Chest {chestNumber}...
+        {!questionData ? `Invalid Chest Number: ${chestNumber}` : `Loading Treasure Chest ${chestNumber}...`}
       </div>
     );
   }
+
+  const isCorrectAnswer = questionData && selectedElement === questionData.target;
 
   return (
     <div style={{
@@ -79,13 +183,11 @@ export default function ChestQuestionPage() {
       padding: "20px",
       fontFamily: "Inter, Arial, sans-serif"
     }}>
-      {/* Header */}
       <div style={{
         textAlign: "center",
         marginBottom: "30px"
       }}>
         <h1 style={{
-          fontFamily: "Bangers, cursive",
           color: "#ffcc66",
           fontSize: "2rem",
           marginBottom: "10px",
@@ -101,7 +203,6 @@ export default function ChestQuestionPage() {
         </p>
       </div>
 
-      {/* Interactive Physics Diagram */}
       <div style={{
         maxWidth: "800px",
         margin: "0 auto",
@@ -114,83 +215,13 @@ export default function ChestQuestionPage() {
           textAlign: "center",
           marginBottom: "20px",
           color: "#b80f2c",
-          fontSize: "1.5rem",
-          fontFamily: "'Press Start 2P', cursive"
+          fontSize: "1.5rem"
         }}>
-          Concave Mirror Ray Diagram
+          {questionData.question}
         </h3>
         
-        <div style={{ 
-          background: "#f8f9fa", 
-          borderRadius: "12px", 
-          padding: "20px",
-          marginBottom: "20px"
-        }}>
-          <svg width="100%" height="250" viewBox="0 0 500 200" style={{ border: "2px solid #e0e0e0", borderRadius: "8px", background: "#fff" }}>
-            {/* Principal Axis */}
-            <line 
-              x1="50" y1="100" x2="450" y2="100" 
-              stroke="#333" 
-              strokeWidth="3"
-              onClick={() => handleElementClick('principal-axis')}
-              style={{ cursor: 'pointer' }}
-            />
-            <text x="460" y="105" fontSize="12" fill="#333">Principal Axis</text>
-            
-            {/* Center of Curvature (C) */}
-            <circle 
-              cx="250" cy="100" r="6" 
-              fill={selectedElement === 'center-curvature' ? "#e74c3c" : "#3498db"}
-              stroke="#fff"
-              strokeWidth="2"
-              onClick={() => handleElementClick('center-curvature')}
-              style={{ cursor: 'pointer' }}
-            />
-            <text x="250" y="125" textAnchor="middle" fontSize="14" fontWeight="bold" fill="#3498db">C</text>
-            
-            {/* Focal Point (F) */}
-            <circle 
-              cx="325" cy="100" r="6" 
-              fill={selectedElement === 'focal-point' ? "#e74c3c" : "#f39c12"}
-              stroke="#fff"
-              strokeWidth="2"
-              onClick={() => handleElementClick('focal-point')}
-              style={{ cursor: 'pointer' }}
-            />
-            <text x="325" y="125" textAnchor="middle" fontSize="14" fontWeight="bold" fill="#f39c12">F</text>
-            
-            {/* Concave Mirror */}
-            <path 
-              d="M 400 30 Q 430 100 400 170" 
-              stroke={selectedElement === 'concave-mirror' ? "#e74c3c" : "#87ceeb"}
-              strokeWidth="12" 
-              fill="none"
-              onClick={() => handleElementClick('concave-mirror')}
-              style={{ cursor: 'pointer' }}
-            />
-            
-            {/* Object (Arrow) */}
-            <line x1="150" y1="100" x2="150" y2="60" stroke="#e74c3c" strokeWidth="4" />
-            <polygon points="145,60 150,50 155,60" fill="#e74c3c" />
-            <text x="150" y="45" textAnchor="middle" fontSize="12" fill="#e74c3c" fontWeight="bold">Object</text>
-            
-            {/* Sample Light Rays */}
-            <line x1="150" y1="60" x2="400" y2="60" stroke="#27ae60" strokeWidth="2" strokeDasharray="5,5" opacity="0.7" />
-            <line x1="150" y1="60" x2="325" y2="100" stroke="#27ae60" strokeWidth="2" strokeDasharray="5,5" opacity="0.7" />
-            <line x1="325" y1="100" x2="400" y2="140" stroke="#27ae60" strokeWidth="2" strokeDasharray="5,5" opacity="0.7" />
-            
-            {/* Reflected Rays */}
-            <line x1="400" y1="60" x2="250" y2="100" stroke="#9b59b6" strokeWidth="2" strokeDasharray="3,3" opacity="0.7" />
-            <line x1="400" y1="140" x2="250" y2="100" stroke="#9b59b6" strokeWidth="2" strokeDasharray="3,3" opacity="0.7" />
-            
-            {/* Image (behind mirror) */}
-            <line x1="280" y1="100" x2="280" y2="120" stroke="#e67e22" strokeWidth="3" strokeDasharray="2,2" opacity="0.8" />
-            <polygon points="275,120 280,125 285,120" fill="#e67e22" opacity="0.8" />
-            <text x="280" y="140" textAnchor="middle" fontSize="10" fill="#e67e22">Image</text>
-          </svg>
-        </div>
+        {getChestContent()}
 
-        {/* Question */}
         <div style={{
           background: "#fff3cd",
           border: "2px solid #ffc107",
@@ -199,42 +230,40 @@ export default function ChestQuestionPage() {
           marginBottom: "20px"
         }}>
           <h4 style={{ color: "#856404", marginBottom: "10px" }}>
-            📝 Your Mission: Click on the FOCAL POINT in the diagram above
+            Your Mission: {questionData.description}
           </h4>
           <p style={{ color: "#856404", margin: 0 }}>
-            The focal point (F) is where parallel light rays converge after reflecting from the concave mirror.
+            {questionData.explanation}
           </p>
         </div>
 
-        {/* Feedback */}
         {selectedElement && (
           <div style={{
-            background: selectedElement === 'focal-point' ? "#d4edda" : "#f8d7da",
-            border: `2px solid ${selectedElement === 'focal-point' ? "#28a745" : "#dc3545"}`,
+            background: isCorrectAnswer ? "#d4edda" : "#f8d7da",
+            border: `2px solid ${isCorrectAnswer ? "#28a745" : "#dc3545"}`,
             borderRadius: "8px",
             padding: "15px",
             marginBottom: "20px"
           }}>
             <p style={{ 
-              color: selectedElement === 'focal-point' ? "#155724" : "#721c24",
+              color: isCorrectAnswer ? "#155724" : "#721c24",
               margin: 0,
               fontWeight: "bold"
             }}>
-              {selectedElement === 'focal-point' 
-                ? "🎉 Excellent! You found the focal point!" 
+              {isCorrectAnswer 
+                ? `🎉 Excellent! You found the ${questionData.target.replace('-', ' ')}!` 
                 : `❌ You selected the ${selectedElement.replace('-', ' ')}. Try again!`}
             </p>
           </div>
         )}
 
-        {/* Action Buttons */}
         <div style={{
           display: "flex",
           gap: "15px",
           justifyContent: "center"
         }}>
           <button
-            onClick={() => router.push(`/game/chapter1/level1?session=${sessionId}`)}
+            onClick={() => router.push("/game/chapter1/level1")}
             style={{
               background: "#6c757d",
               color: "white",
@@ -249,7 +278,7 @@ export default function ChestQuestionPage() {
             ← Back to Chests
           </button>
           
-          {selectedElement === 'focal-point' && (
+          {isCorrectAnswer && (
             <button
               onClick={handleSubmitAnswer}
               style={{

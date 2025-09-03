@@ -1,22 +1,17 @@
 "use client";
 import React, { useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 export default function Chapter1Overview() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const sessionId = searchParams.get('session');
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      const levelPath = sessionId 
-        ? `/game/chapter1/level1?session=${sessionId}`
-        : `/game/chapter1/level1`;
-      router.push(levelPath);
+      router.push(`/game/chapter1/level1`);
     }, 3000); 
 
     return () => clearTimeout(timer);
-  }, [router, sessionId]);
+  }, [router]);
 
   return (
     <div style={{ 

@@ -1,16 +1,8 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { io } from "socket.io-client";
 import Image from "next/image";
-
-interface Question {
-  id: string;
-  question: string;
-  options: string[];
-  text: string;
-  correctAnswer: number;
-}
 
 interface QuestionState {
   id: string;
@@ -24,36 +16,31 @@ interface QuestionState {
 
 export default function Chapter1Level1() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const sessionId = searchParams.get("session");
 
-  const [questions, setQuestions] = useState<Question[]>([]);
   const [questionStates, setQuestionStates] = useState<
     Record<string, QuestionState>
   >({});
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!sessionId) {
-      router.push("/student/lobby");
-      return;
-    }
-
     const s = io("http://localhost:3000");
 
     s.on("connect", () => {
       console.log("[game] Connected to game server");
-      s.emit("getQuestions", { sessionId });
+      s.emit("getQuestions"); 
+    });
+
+    s.on("userInfo", (userInfo) => {
+      setCurrentUserId(userInfo.id);
     });
 
     s.on(
       "questionsUpdate",
       (data: {
-        questions: Question[];
         questionStates: Record<string, QuestionState>;
       }) => {
-        console.log("[game] Questions updated:", data);
-        setQuestions(data.questions);
+        console.log("[game] Question states updated:", data);
         setQuestionStates(data.questionStates);
         setLoading(false);
       }
@@ -61,7 +48,7 @@ export default function Chapter1Level1() {
 
     s.on("answerResult", (data: { questionId: string; isCorrect: boolean }) => {
       console.log("[game] Answer result:", data);
-      // Results are now handled in individual chest pages
+
     });
 
     s.on("gameCompleted", (data) => {
@@ -81,21 +68,23 @@ export default function Chapter1Level1() {
     return () => {
       s.disconnect();
     };
-  }, [sessionId, router]);
+  }, [router]);
 
   const handleBackToLobby = () => {
     router.push("/student/lobby");
   };
 
-  const handleClaimQuestion = (question: Question, index: number) => {
-    if (!sessionId) return;
+  const handleClaimQuestion = (index: number) => {
+    const chestId = `chest${index + 1}`;
+    const state = questionStates[chestId];
+    const canAccess = !state || 
+                     state.status === "available" || 
+                     (state.status === "claimed" && state.claimedBy === currentUserId);
+    
+    if (!canAccess) return;
 
-    const state = questionStates[question.id];
-    if (state?.status !== "available") return;
-
-    // Navigate to the individual chest page
     const chestNumber = index + 1;
-    router.push(`/game/chapter1/level1/${chestNumber}?session=${sessionId}`);
+    router.push(`/game/chapter1/level1/${chestNumber}`);
   };
 
   const getQuestionStatusColor = (state: QuestionState | undefined) => {
@@ -232,16 +221,19 @@ export default function Chapter1Level1() {
               justifyItems: "center",
             }}
           >
-            {questions.map((question, index) => {
-              const state = questionStates[question.id];
-              const isAvailable = !state || state.status === "available";
+            {[1, 2, 3, 4].map((chestNumber, index) => {
+              const chestId = `chest${chestNumber}`;
+              const state = questionStates[chestId];
+              const isAvailable = !state || 
+                                 state.status === "available" || 
+                                 (state.status === "claimed" && state.claimedBy === currentUserId);
               const isClaimed = state?.status === "claimed";
               const isCompleted = state?.status === "completed";
 
               return (
                 <div
-                  key={question.id}
-                  onClick={() => isAvailable && handleClaimQuestion(question, index)}
+                  key={chestId}
+                  onClick={() => isAvailable && handleClaimQuestion(index)}
                   style={{
                     cursor: isAvailable ? "pointer" : "not-allowed",
                     textAlign: "center",
@@ -414,7 +406,7 @@ export default function Chapter1Level1() {
                         marginBottom: "4px",
                       }}
                     >
-                      Chest {index + 1}
+                      Chest {chestNumber}
                     </div>
 
                     <div
