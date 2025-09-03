@@ -26,9 +26,16 @@ export default function StudentGuide() {
       style={{ position: "relative", paddingTop: "72px" }}
     >
       <button
-        onClick={() => {
-          signOut();
-          router.push("/");
+        onClick={async () => {
+          try {
+            await signOut({ 
+              redirect: false,
+              callbackUrl: "/"
+            });
+            window.location.href = "/";
+          } catch (error) {
+            console.error("Logout failed:", error);
+          }
         }}
         style={{
           position: "absolute",

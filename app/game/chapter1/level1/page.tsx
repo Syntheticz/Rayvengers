@@ -1,16 +1,8 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { io } from "socket.io-client";
 import Image from "next/image";
-
-interface Question {
-  id: string;
-  question: string;
-  options: string[];
-  text: string;
-  correctAnswer: number;
-}
 
 interface QuestionState {
   id: string;
@@ -24,36 +16,29 @@ interface QuestionState {
 
 export default function Chapter1Level1() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const sessionId = searchParams.get("session");
 
-  const [questions, setQuestions] = useState<Question[]>([]);
   const [questionStates, setQuestionStates] = useState<
     Record<string, QuestionState>
   >({});
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    // if (!sessionId) {
-    //   router.push("/student/lobby");
-    //   return;
-    // }
-
     const s = io("http://localhost:3000");
 
     s.on("connect", () => {
       console.log("[game] Connected to game server");
-      s.emit("getQuestions", { sessionId });
+      s.emit("getQuestions");
+    });
+
+    s.on("userInfo", (userInfo) => {
+      setCurrentUserId(userInfo.id);
     });
 
     s.on(
       "questionsUpdate",
-      (data: {
-        questions: Question[];
-        questionStates: Record<string, QuestionState>;
-      }) => {
-        console.log("[game] Questions updated:", data);
-        setQuestions(data.questions);
+      (data: { questionStates: Record<string, QuestionState> }) => {
+        console.log("[game] Question states updated:", data);
         setQuestionStates(data.questionStates);
         setLoading(false);
       }
@@ -61,7 +46,6 @@ export default function Chapter1Level1() {
 
     s.on("answerResult", (data: { questionId: string; isCorrect: boolean }) => {
       console.log("[game] Answer result:", data);
-      // Results are now handled in individual chest pages
     });
 
     s.on("gameCompleted", (data) => {
@@ -81,21 +65,24 @@ export default function Chapter1Level1() {
     return () => {
       s.disconnect();
     };
-  }, [sessionId, router]);
+  }, [router]);
 
   const handleBackToLobby = () => {
     router.push("/student/lobby");
   };
 
-  const handleClaimQuestion = (question: Question, index: number) => {
-    if (!sessionId) return;
+  const handleClaimQuestion = (index: number) => {
+    const chestId = `chest${index + 1}`;
+    const state = questionStates[chestId];
+    const canAccess =
+      !state ||
+      state.status === "available" ||
+      (state.status === "claimed" && state.claimedBy === currentUserId);
 
-    const state = questionStates[question.id];
-    if (state?.status !== "available") return;
+    if (!canAccess) return;
 
-    // Navigate to the individual chest page
     const chestNumber = index + 1;
-    router.push(`/game/chapter1/level1/${chestNumber}?session=${sessionId}`);
+    router.push(`/game/chapter1/level1/${chestNumber}`);
   };
 
   const getQuestionStatusColor = (state: QuestionState | undefined) => {
@@ -224,234 +211,238 @@ export default function Chapter1Level1() {
           Choose Your Treasure Chest
         </h2>
 
-          <div
-            style={{
-              display: "grid",
-              gap: "20px",
-              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-              justifyItems: "center",
-            }}
-          >
-            {questions.map((question, index) => {
-              const state = questionStates[question.id];
-              const isAvailable = !state || state.status === "available";
-              const isClaimed = state?.status === "claimed";
-              const isCompleted = state?.status === "completed";
+        <div
+          style={{
+            display: "grid",
+            gap: "20px",
+            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+            justifyItems: "center",
+          }}
+        >
+          {[1, 2, 3, 4].map((chestNumber, index) => {
+            const chestId = `chest${chestNumber}`;
+            const state = questionStates[chestId];
+            const isAvailable =
+              !state ||
+              state.status === "available" ||
+              (state.status === "claimed" && state.claimedBy === currentUserId);
+            const isClaimed = state?.status === "claimed";
+            const isCompleted = state?.status === "completed";
 
-              return (
+            return (
+              <div
+                key={chestId}
+                onClick={() => isAvailable && handleClaimQuestion(index)}
+                style={{
+                  cursor: isAvailable ? "pointer" : "not-allowed",
+                  textAlign: "center",
+                  transform: isAvailable ? "scale(1)" : "scale(0.9)",
+                  opacity: isAvailable ? 1 : 0.7,
+                  transition: "all 0.3s ease",
+                  filter: isAvailable ? "none" : "grayscale(50%)",
+                }}
+              >
+                {/* Treasure Chest */}
                 <div
-                  key={question.id}
-                  onClick={() => isAvailable && handleClaimQuestion(question, index)}
                   style={{
+                    width: "120px",
+                    height: "120px",
+                    margin: "0 auto 16px",
+                    position: "relative",
                     cursor: isAvailable ? "pointer" : "not-allowed",
-                    textAlign: "center",
-                    transform: isAvailable ? "scale(1)" : "scale(0.9)",
-                    opacity: isAvailable ? 1 : 0.7,
-                    transition: "all 0.3s ease",
-                    filter: isAvailable ? "none" : "grayscale(50%)",
                   }}
                 >
-                  {/* Treasure Chest */}
-                  <div
+                  <Image
+                    src="/chest.png"
+                    alt="Treasure Chest"
+                    width={120}
+                    height={120}
                     style={{
-                      width: "120px",
-                      height: "120px",
-                      margin: "0 auto 16px",
-                      position: "relative",
-                      cursor: isAvailable ? "pointer" : "not-allowed",
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "contain",
+                      filter: isCompleted
+                        ? state?.isCorrect
+                          ? "hue-rotate(120deg) saturate(1.2)"
+                          : "hue-rotate(0deg) saturate(1.5)"
+                        : isClaimed
+                        ? "hue-rotate(45deg) saturate(1.1)"
+                        : isAvailable
+                        ? "none"
+                        : "grayscale(70%) opacity(0.6)",
+                      transition: "all 0.3s ease",
                     }}
-                  >
-                    <Image
-                      src="/chest.png"
-                      alt="Treasure Chest"
-                      width={120}
-                      height={120}
+                    priority
+                  />
+
+                  {/* Status Overlay */}
+                  {isCompleted && (
+                    <div
                       style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "contain",
-                        filter: isCompleted
-                          ? state?.isCorrect
-                            ? "hue-rotate(120deg) saturate(1.2)"
-                            : "hue-rotate(0deg) saturate(1.5)"
-                          : isClaimed
-                          ? "hue-rotate(45deg) saturate(1.1)"
-                          : isAvailable
-                          ? "none"
-                          : "grayscale(70%) opacity(0.6)",
-                        transition: "all 0.3s ease",
+                        position: "absolute",
+                        top: "10px",
+                        right: "10px",
+                        width: "24px",
+                        height: "24px",
+                        background: state?.isCorrect ? "#22c55e" : "#ef4444",
+                        borderRadius: "50%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+                        border: "2px solid white",
                       }}
-                      priority
+                    >
+                      <span
+                        style={{
+                          color: "white",
+                          fontSize: "14px",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {state?.isCorrect ? "✓" : "✗"}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Claimed Indicator */}
+                  {isClaimed && !isCompleted && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "10px",
+                        right: "10px",
+                        width: "20px",
+                        height: "20px",
+                        background: "#f59e0b",
+                        borderRadius: "50%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+                        border: "2px solid white",
+                      }}
+                    >
+                      <span
+                        style={{
+                          color: "white",
+                          fontSize: "10px",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        ⏳
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Magical Glow Effect for Available Chests */}
+                  {isAvailable && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: "-10px",
+                        background:
+                          "radial-gradient(circle, rgba(255,204,102,0.3) 0%, transparent 70%)",
+                        borderRadius: "50%",
+                        animation: "pulse 2s infinite",
+                      }}
                     />
+                  )}
 
-                    {/* Status Overlay */}
-                    {isCompleted && (
+                  {/* Sparkles for Completed Chests */}
+                  {isCompleted && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: "-5px",
+                        pointerEvents: "none",
+                      }}
+                    >
                       <div
                         style={{
                           position: "absolute",
-                          top: "10px",
-                          right: "10px",
-                          width: "24px",
-                          height: "24px",
-                          background: state?.isCorrect ? "#22c55e" : "#ef4444",
+                          top: "10%",
+                          right: "10%",
+                          width: "8px",
+                          height: "8px",
+                          background: "#fbbf24",
                           borderRadius: "50%",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-                          border: "2px solid white",
-                        }}
-                      >
-                        <span
-                          style={{
-                            color: "white",
-                            fontSize: "14px",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {state?.isCorrect ? "✓" : "✗"}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Claimed Indicator */}
-                    {isClaimed && !isCompleted && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: "10px",
-                          right: "10px",
-                          width: "20px",
-                          height: "20px",
-                          background: "#f59e0b",
-                          borderRadius: "50%",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-                          border: "2px solid white",
-                        }}
-                      >
-                        <span
-                          style={{
-                            color: "white",
-                            fontSize: "10px",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          ⏳
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Magical Glow Effect for Available Chests */}
-                    {isAvailable && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          inset: "-10px",
-                          background:
-                            "radial-gradient(circle, rgba(255,204,102,0.3) 0%, transparent 70%)",
-                          borderRadius: "50%",
-                          animation: "pulse 2s infinite",
+                          animation: "sparkle 1.5s infinite",
                         }}
                       />
-                    )}
-
-                    {/* Sparkles for Completed Chests */}
-                    {isCompleted && (
                       <div
                         style={{
                           position: "absolute",
-                          inset: "-5px",
-                          pointerEvents: "none",
+                          bottom: "20%",
+                          left: "15%",
+                          width: "6px",
+                          height: "6px",
+                          background: "#f59e0b",
+                          borderRadius: "50%",
+                          animation: "sparkle 1.5s infinite 0.3s",
                         }}
-                      >
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: "10%",
-                            right: "10%",
-                            width: "8px",
-                            height: "8px",
-                            background: "#fbbf24",
-                            borderRadius: "50%",
-                            animation: "sparkle 1.5s infinite",
-                          }}
-                        />
-                        <div
-                          style={{
-                            position: "absolute",
-                            bottom: "20%",
-                            left: "15%",
-                            width: "6px",
-                            height: "6px",
-                            background: "#f59e0b",
-                            borderRadius: "50%",
-                            animation: "sparkle 1.5s infinite 0.3s",
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
+                      />
+                    </div>
+                  )}
+                </div>
 
-                  {/* Chest Label */}
+                {/* Chest Label */}
+                <div
+                  style={{
+                    background: "rgba(255,255,255,0.95)",
+                    borderRadius: "12px",
+                    padding: "8px 12px",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+                    border: `2px solid ${getQuestionStatusColor(state)}`,
+                  }}
+                >
                   <div
                     style={{
-                      background: "rgba(255,255,255,0.95)",
-                      borderRadius: "12px",
-                      padding: "8px 12px",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-                      border: `2px solid ${getQuestionStatusColor(state)}`,
+                      color: "#b80f2c",
+                      fontSize: "14px",
+                      fontWeight: "bold",
+                      fontFamily: "'Press Start 2P', cursive",
+                      marginBottom: "4px",
                     }}
                   >
-                    <div
-                      style={{
-                        color: "#b80f2c",
-                        fontSize: "14px",
-                        fontWeight: "bold",
-                        fontFamily: "'Press Start 2P', cursive",
-                        marginBottom: "4px",
-                      }}
-                    >
-                      Chest {index + 1}
-                    </div>
+                    Chest {chestNumber}
+                  </div>
 
-                    <div
-                      style={{
-                        color: "#666",
-                        fontSize: "10px",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {getQuestionStatusText(state)}
-                    </div>
+                  <div
+                    style={{
+                      color: "#666",
+                      fontSize: "10px",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {getQuestionStatusText(state)}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-
-          {/* Instructions */}
-          <div
-            style={{
-              marginTop: "40px",
-              textAlign: "center",
-              color: "rgba(255,255,255,0.8)",
-              fontSize: "14px",
-              maxWidth: "500px",
-              margin: "40px auto 0",
-            }}
-          >
-            <p style={{ margin: "0 0 8px 0" }}>
-              <strong>Choose a treasure chest to reveal your question!</strong>
-            </p>
-            <p style={{ margin: 0, fontSize: "12px" }}>
-              Once claimed, other students can&apos;t pick the same chest.
-              Answer correctly to unlock the treasure!
-            </p>
-          </div>
+              </div>
+            );
+          })}
         </div>
+
+        {/* Instructions */}
+        <div
+          style={{
+            marginTop: "40px",
+            textAlign: "center",
+            color: "rgba(255,255,255,0.8)",
+            fontSize: "14px",
+            maxWidth: "500px",
+            margin: "40px auto 0",
+          }}
+        >
+          <p style={{ margin: "0 0 8px 0" }}>
+            <strong>Choose a treasure chest to reveal your question!</strong>
+          </p>
+          <p style={{ margin: 0, fontSize: "12px" }}>
+            Once claimed, other students can&apos;t pick the same chest. Answer
+            correctly to unlock the treasure!
+          </p>
+        </div>
+      </div>
 
       <style jsx>{`
         @keyframes spin {

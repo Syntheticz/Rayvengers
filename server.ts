@@ -25,7 +25,6 @@ interface Question {
   text: string;
   options: string[];
   correctAnswer: number;
-  points: number;
 }
 
 interface QuestionState {
@@ -38,51 +37,20 @@ interface QuestionState {
   completedAt?: Date;
 }
 
-interface GameSession {
-  id: string;
+interface GameState {
+  isActive: boolean;
   chapter: string;
   level: string;
-  students: string[]; // socket IDs
-  questions: Question[];
-  questionStates: Record<string, QuestionState>; // questionId -> state
-  startedAt: Date;
-  isActive: boolean;
+  startedAt?: Date;
+  questionStates: Record<string, QuestionState>;
 }
 
-// Store active game sessions
-const gameSessions: Record<string, GameSession> = {};
-
-// Sample questions for Chapter 1 Level 1
-const chapter1Level1Questions: Question[] = [
-  {
-    id: "c1l1q1",
-    text: "When light travels from air into water, what happens to its speed?",
-    options: ["Increases", "Decreases", "Stays the same", "Becomes zero"],
-    correctAnswer: 1,
-    points: 10,
-  },
-  {
-    id: "c1l1q2",
-    text: "What is the unit of measurement for the frequency of light?",
-    options: ["Meters", "Hertz", "Joules", "Watts"],
-    correctAnswer: 1,
-    points: 10,
-  },
-  {
-    id: "c1l1q3",
-    text: "Which color of light has the shortest wavelength?",
-    options: ["Red", "Green", "Blue", "Violet"],
-    correctAnswer: 3,
-    points: 10,
-  },
-  {
-    id: "c1l1q4",
-    text: "What phenomenon occurs when light bends as it passes through a lens?",
-    options: ["Reflection", "Refraction", "Diffraction", "Interference"],
-    correctAnswer: 1,
-    points: 10,
-  },
-];
+const gameState: GameState = {
+  isActive: false,
+  chapter: "chapter1",
+  level: "level1",
+  questionStates: {}
+};
 
 const lobby: Record<string, LobbyStudent> = {};
 
@@ -130,14 +98,17 @@ app.prepare().then(() => {
     console.log(`🔌 Connected: ${user.name} (${user.role})`);
     // console.log(user);
 
+    // Send user info to client
+    socket.emit("userInfo", { id: user.id, name: user.name, role: user.role });
+
     socket.emit("lobbyUpdate", Object.values(lobby));
 
     socket.on("joinLobby", async (payload, ack) => {
       try {
-        // For now, use socket ID as identifier - should be using the database name and section
+
         const socketId = payload?.socketId || socket.id;
         const name = `${user.name}`;
-        const section = user.section || ""; // Default section
+        const section = user.section || ""; 
 
         console.log("received joinLobby from", socket.id, "payload:", payload);
         lobby[socket.id] = {
@@ -162,7 +133,7 @@ app.prepare().then(() => {
             console.warn("ack callback error", e);
           }
         } else {
-          // Fallback emit
+      
           socket.emit("joined", lobby[socket.id]);
         }
       } catch (error) {
@@ -179,8 +150,6 @@ app.prepare().then(() => {
       console.log("📊 Current lobby students:", Object.keys(lobby));
       console.log("🔗 Total connected clients:", io.engine.clientsCount);
 
-      // Create new game session
-      const sessionId = `game_${Date.now()}`;
       const lobbyStudents = Object.keys(lobby);
 
       if (lobbyStudents.length === 0) {
@@ -188,34 +157,22 @@ app.prepare().then(() => {
         return;
       }
 
-      // Initialize question states
-      const questionStates: Record<string, QuestionState> = {};
-      chapter1Level1Questions.forEach((q) => {
-        questionStates[q.id] = {
-          id: q.id,
-          status: "available",
-        };
-      });
+  
+      gameState.isActive = true;
+      gameState.chapter = gameData.chapter || "chapter1";
+      gameState.level = gameData.level || "level1";
+      gameState.startedAt = new Date();
+      
 
-      // Create game session
-      gameSessions[sessionId] = {
-        id: sessionId,
-        chapter: gameData.chapter || "chapter1",
-        level: gameData.level || "level1",
-        students: lobbyStudents,
-        questions: chapter1Level1Questions,
-        questionStates,
-        startedAt: new Date(),
-        isActive: true,
+      gameState.questionStates = {
+        "chest1": { id: "chest1", status: "available" },
+        "chest2": { id: "chest2", status: "available" },
+        "chest3": { id: "chest3", status: "available" },
+        "chest4": { id: "chest4", status: "available" }
       };
-
-      // First send a test event to check if students receive it
-      io.emit("testEvent", { message: "Test event from server" });
-      console.log("📤 Sent testEvent to all clients");
 
       // Notify all students in lobby to start the game
       const gameStartData = {
-        sessionId,
         chapter: gameData.chapter || "chapter1",
         level: gameData.level || "level1",
         message: "Game is starting! Get ready...",
@@ -226,60 +183,54 @@ app.prepare().then(() => {
 
       // Send acknowledgment back to teacher
       socket.emit("gameStartAck", {
-        sessionId,
         studentsNotified: lobbyStudents.length,
         totalClients: io.engine.clientsCount,
       });
     });
 
-    // Handle student requesting questions list
-    socket.on("getQuestions", (data) => {
-      const { sessionId } = data;
-      const session = gameSessions[sessionId];
-
-      if (!session || !session.isActive) {
-        socket.emit("questionsError", { message: "Game session not found" });
+    // send game state
+    socket.on("getQuestions", () => {
+      if (!gameState.isActive) {
+        socket.emit("questionsError", { message: "No active game" });
         return;
       }
 
-      // Send questions with current states
       socket.emit("questionsUpdate", {
-        questions: session.questions,
-        questionStates: session.questionStates,
+        questionStates: gameState.questionStates,
       });
     });
 
     // Handle student claiming a question
     socket.on("claimQuestion", (data) => {
-      const { sessionId, questionId } = data;
-      const session = gameSessions[sessionId];
+      const { questionId } = data;
+      const user = (socket as any).user;
 
-      if (!session || !session.isActive) {
-        socket.emit("claimError", { message: "Game session not found" });
+      if (!gameState.isActive) {
+        socket.emit("claimError", { message: "No active game" });
         return;
       }
 
-      const questionState = session.questionStates[questionId];
-      if (!questionState || questionState.status !== "available") {
+      const questionState = gameState.questionStates[questionId];
+      if (!questionState) {
+        socket.emit("claimError", { message: "Question not found" });
+        return;
+      }
+      if (questionState.status !== "available" && 
+          (questionState.status !== "claimed" || questionState.claimedBy !== user.id)) {
         socket.emit("claimError", { message: "Question not available" });
         return;
       }
 
-      // Claim the question
+      // Claim the question (or re-claim if it's the same user)
       questionState.status = "claimed";
-      questionState.claimedBy = socket.id;
-      questionState.claimedByName =
-        lobby[socket.id]?.name || `Student-${socket.id.slice(-4)}`;
+      questionState.claimedBy = user.id; 
+      questionState.claimedByName = user.name;
 
-      // Broadcast updated state to all students in the session
-      session.students.forEach((studentId) => {
-        const studentSocket = io.sockets.sockets.get(studentId);
-        if (studentSocket) {
-          studentSocket.emit("questionsUpdate", {
-            questions: session.questions,
-            questionStates: session.questionStates,
-          });
-        }
+      console.log(`📝 Question ${questionId} claimed by ${questionState.claimedByName} (${user.id})`);
+
+      // Broadcast updated state to all connected students
+      io.emit("questionsUpdate", {
+        questionStates: gameState.questionStates,
       });
 
       console.log(
@@ -287,52 +238,44 @@ app.prepare().then(() => {
       );
     });
 
-    // Handle student submitting answer
+    // Answer submit handle
     socket.on("submitAnswer", (data) => {
-      const { sessionId, questionId, answer } = data;
-      const session = gameSessions[sessionId];
+      const { questionId, answer } = data;
+      const user = (socket as any).user;
 
-      if (!session || !session.isActive) {
-        socket.emit("submitError", { message: "Game session not found" });
+      if (!gameState.isActive) {
+        socket.emit("submitError", { message: "No active game" });
         return;
       }
 
-      const questionState = session.questionStates[questionId];
-      if (!questionState || questionState.claimedBy !== socket.id) {
+      const questionState = gameState.questionStates[questionId];
+      if (!questionState || questionState.claimedBy !== user.id) {
         socket.emit("submitError", { message: "Question not claimed by you" });
         return;
       }
 
-      const question = session.questions.find((q) => q.id === questionId);
-      if (!question) {
-        socket.emit("submitError", { message: "Question not found" });
-        return;
-      }
+      let isCorrect = false;
+      if (questionId === "chest1" && answer === "focal-point") isCorrect = true;
+      if (questionId === "chest2" && answer === "center-curvature") isCorrect = true;
+      if (questionId === "chest3" && answer === "principal-axis") isCorrect = true;
+      if (questionId === "chest4" && answer === "concave-mirror") isCorrect = true;
 
-      // Process the answer
-      const isCorrect = answer === question.correctAnswer;
       questionState.status = "completed";
       questionState.answer = answer;
       questionState.isCorrect = isCorrect;
       questionState.completedAt = new Date();
 
-      // Broadcast updated state to all students
-      session.students.forEach((studentId) => {
-        const studentSocket = io.sockets.sockets.get(studentId);
-        if (studentSocket) {
-          studentSocket.emit("questionsUpdate", {
-            questions: session.questions,
-            questionStates: session.questionStates,
-          });
-        }
+      console.log(`✅ ${user.name} ${isCorrect ? 'correctly' : 'incorrectly'} answered ${questionId}: ${answer}`);
+
+      // Broadcast to students
+      io.emit("questionsUpdate", {
+        questionStates: gameState.questionStates,
       });
 
-      // Send individual result to the student
+
       socket.emit("answerResult", {
         questionId,
         isCorrect,
-        points: isCorrect ? question.points : 0,
-        correctAnswer: question.correctAnswer,
       });
 
       console.log(
@@ -341,24 +284,17 @@ app.prepare().then(() => {
         } - ${isCorrect ? "Correct" : "Wrong"}`
       );
 
-      // Check if all questions are completed
-      const allCompleted = Object.values(session.questionStates).every(
+      // Check if questions are complete
+      const allCompleted = Object.values(gameState.questionStates).every(
         (qs) => qs.status === "completed"
       );
 
       if (allCompleted) {
-        // Game completed, send results
-        session.isActive = false;
-        session.students.forEach((studentId) => {
-          const studentSocket = io.sockets.sockets.get(studentId);
-          if (studentSocket) {
-            studentSocket.emit("gameCompleted", {
-              sessionId,
-              results: session.questionStates,
-            });
-          }
+        gameState.isActive = false;
+        io.emit("gameCompleted", {
+          results: gameState.questionStates,
         });
-        console.log(`🎉 Game session ${sessionId} completed!`);
+        console.log(`🎉 Game completed!`);
       }
     });
 
