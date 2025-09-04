@@ -330,17 +330,17 @@ app.prepare().then(() => {
         (qs) => qs.status === "completed"
       );
 
-      if (allCompleted) {
-        gameState.isActive = false;
-        const nextLevel = getNextLevel(gameState.chapter, gameState.level);
-        io.emit("gameCompleted", {
-          results: gameState.questionStates,
-          chapter: gameState.chapter,
-          level: gameState.level,
-          completedAt: new Date().toISOString(),
-        });
-        console.log(`🎉 Game completed!`);
-      }
+      // if (allCompleted) {
+      //   gameState.isActive = false;
+      //   const nextLevel = extLevel(gameState.chapter, gameState.level);
+      //   io.emit("gameCompleted", {
+      //     results: gameState.questionStates,
+      //     chapter: gameState.chapter,
+      //     level: gameState.level,
+      //     completedAt: new Date().toISOString(),
+      //   });
+      //   console.log(`🎉 Game completed!`);
+      // }
     });
 
     socket.on("endGame", () => {
