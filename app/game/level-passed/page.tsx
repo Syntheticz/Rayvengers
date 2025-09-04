@@ -1,18 +1,27 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { io, Socket } from 'socket.io-client';
 
 export default function LevelPassedPage() {
   const router = useRouter();
   const params = useSearchParams();
   const chapter = params.get('chapter') || 'chapter1';
   const level = params.get('level') || 'level1';
+  const hintedNext = params.get('nextLevel');
   const [show, setShow] = useState(false);
+  const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(()=>{
     // trigger mount animation
     const t = setTimeout(()=> setShow(true), 50);
     return ()=> clearTimeout(t);
+  },[]);
+
+  useEffect(()=>{
+    const s = io('http://localhost:3000');
+    setSocket(s);
+    return ()=> { s.disconnect(); };
   },[]);
 
   return (
@@ -75,8 +84,26 @@ export default function LevelPassedPage() {
           Great work conquering {chapter.toUpperCase()} / {level.toUpperCase()}! Prepare for the next challenge.
         </p>
         <div style={{display:'flex', gap:16, justifyContent:'center', marginTop:40, flexWrap:'wrap'}}>
-          <button onClick={()=> router.push(`/game/${chapter}/${level}`)} style={btnStyle('#555','#888')}>Replay Level</button>
-          <button onClick={()=> router.push(`/game/${chapter}`)} style={btnStyle('#b80f2c','#ffcc66')}>Return to Map</button>
+          <button
+            onClick={()=> {
+              let nextLevel = hintedNext || '';
+              if (!nextLevel) {
+                // Fallback: naive increment only if it matches levelN
+                const m = level.match(/level(\d+)/);
+                if (m) nextLevel = `level${parseInt(m[1],10)+1}`; else nextLevel = '';
+              }
+              if (!nextLevel) {
+                alert('No further level defined.');
+                return;
+              }
+              const nextPath = `/game/${chapter}/${nextLevel}`;
+              if (socket) socket.emit('initLevel', { chapter, level: nextLevel });
+              router.push(nextPath);
+            }}
+            style={btnStyle('#b80f2c','#ffcc66')}
+          >
+            { hintedNext ? 'Next Level' : 'Continue' }
+          </button>
         </div>
       </div>
     </div>

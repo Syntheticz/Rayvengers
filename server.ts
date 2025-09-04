@@ -332,6 +332,7 @@ app.prepare().then(() => {
 
       if (allCompleted) {
         gameState.isActive = false;
+        const nextLevel = getNextLevel(gameState.chapter, gameState.level);
         io.emit("gameCompleted", {
           results: gameState.questionStates,
           chapter: gameState.chapter,
