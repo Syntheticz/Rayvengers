@@ -50,8 +50,17 @@ export default function ChestQuestionPage() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [attempts, setAttempts] = useState<number>(0);
+  const [isCompleted, setIsCompleted] = useState<boolean>(false);
+  const [feedback, setFeedback] = useState<{ message: string; isCorrect: boolean } | null>(null);
   
   const questionData = CHEST_QUESTIONS[chestNumber];
+
+  // Debug: lifecycle
+  useEffect(() => {
+    console.log('[ChestQuestionPage] mount chest', chestNumber);
+    return () => console.log('[ChestQuestionPage] unmount chest', chestNumber);
+  }, [chestNumber]);
 
   useEffect(() => {
     if (!questionData) {
@@ -75,20 +84,49 @@ export default function ChestQuestionPage() {
   }, [chestNumber, questionData, router]);
 
   const handleElementClick = (elementType: string) => {
+    if (isCompleted) return; // ignore after completion
     setSelectedElement(elementType);
+
+    if (!socket) {
+      console.log('[handleElementClick] no socket yet');
+    }
+
+    const isCorrect = elementType === questionData.target;
+    const questionId = `chest${chestNumber}`;
+    console.log('[handleElementClick] attempt', { elementType, isCorrect, attemptsBefore: attempts });
+
+    setAttempts(prev => {
+      const updated = prev + 1;
+      console.log('[attempts] increment (click)', { prev, updated });
+      if (socket) {
+        console.log('[socket.emit] submitAnswer', { questionId, answer: elementType, isCorrect, attempts: updated });
+        socket.emit('submitAnswer', {
+          questionId,
+            answer: elementType,
+            isCorrect,
+            attempts: updated
+        });
+      }
+      return updated;
+    });
+
+    setFeedback({
+      message: isCorrect
+        ? `🎉 Excellent! You found the ${questionData.target.replace('-', ' ')}!`
+        : `❌ You selected the ${elementType.replace('-', ' ')}. Try again!`,
+      isCorrect
+    });
+
+    if (isCorrect) {
+      setIsCompleted(true);
+  // Auto-redirect removed per requirement; user can navigate back manually.
+    }
   };
 
-  const handleSubmitAnswer = () => {
-    if (!socket || !selectedElement) return;
-    
-    const questionId = `chest${chestNumber}`;
-    socket.emit("submitAnswer", {
-      questionId,
-      answer: selectedElement
-    });
-    
-    router.push("/game/chapter1/level1");
-  };
+  // Debug: attempts change watcher
+  useEffect(() => {
+    console.log('[attempts] state changed ->', attempts);
+  }, [attempts]);
 
   const getChestContent = () => {
     if (!questionData) return null;
@@ -174,18 +212,74 @@ export default function ChestQuestionPage() {
     );
   }
 
-  const isCorrectAnswer = questionData && selectedElement === questionData.target;
-
   return (
     <div style={{
       minHeight: "100vh",
       background: "linear-gradient(135deg, #b80f2c 0%, #8b0a1f 100%)",
       padding: "20px",
-      fontFamily: "Inter, Arial, sans-serif"
+      fontFamily: "Inter, Arial, sans-serif",
+      position: "relative"
     }}>
+      {/* Back Button */}
+      <button
+        onClick={() => router.push('/game/chapter1/level1')}
+        style={{
+          position: "absolute",
+          top: "20px",
+          left: "20px",
+          padding: "8px 16px",
+          backgroundColor: "rgba(255, 255, 255, 0.2)",
+          color: "#fff",
+          border: "1px solid rgba(255, 255, 255, 0.3)",
+          borderRadius: "6px",
+          cursor: "pointer",
+          fontSize: "14px",
+          backdropFilter: "blur(10px)"
+        }}
+      >
+        ← Back to Level
+      </button>
+
+      {/* Attempts Counter */}
+      <div style={{
+        position: "absolute",
+        top: "20px",
+        right: "20px",
+        display: "flex",
+        gap: "16px",
+        alignItems: "center"
+      }}>
+        <div style={{
+          padding: "8px 16px",
+          backgroundColor: "rgba(255, 255, 255, 0.2)",
+          color: "#fff",
+          border: "1px solid rgba(255, 255, 255, 0.3)",
+          borderRadius: "6px",
+          fontSize: "14px",
+          backdropFilter: "blur(10px)"
+        }}>
+          Attempts: {attempts}
+        </div>
+        {isCompleted && (
+          <div style={{
+            padding: "8px 16px",
+            backgroundColor: "rgba(34, 197, 94, 0.3)",
+            color: "#fff",
+            border: "1px solid rgba(34, 197, 94, 0.5)",
+            borderRadius: "6px",
+            fontSize: "14px",
+            backdropFilter: "blur(10px)",
+            fontWeight: "bold"
+          }}>
+            ✓ Completed
+          </div>
+        )}
+      </div>
+
       <div style={{
         textAlign: "center",
-        marginBottom: "30px"
+        marginBottom: "30px",
+        marginTop: "60px"
       }}>
         <h1 style={{
           color: "#ffcc66",
@@ -237,22 +331,20 @@ export default function ChestQuestionPage() {
           </p>
         </div>
 
-        {selectedElement && (
+        {feedback && (
           <div style={{
-            background: isCorrectAnswer ? "#d4edda" : "#f8d7da",
-            border: `2px solid ${isCorrectAnswer ? "#28a745" : "#dc3545"}`,
+            background: feedback.isCorrect ? "#d4edda" : "#f8d7da",
+            border: `2px solid ${feedback.isCorrect ? "#28a745" : "#dc3545"}`,
             borderRadius: "8px",
             padding: "15px",
             marginBottom: "20px"
           }}>
             <p style={{ 
-              color: isCorrectAnswer ? "#155724" : "#721c24",
+              color: feedback.isCorrect ? "#155724" : "#721c24",
               margin: 0,
               fontWeight: "bold"
             }}>
-              {isCorrectAnswer 
-                ? `🎉 Excellent! You found the ${questionData.target.replace('-', ' ')}!` 
-                : `❌ You selected the ${selectedElement.replace('-', ' ')}. Try again!`}
+              {feedback.message}
             </p>
           </div>
         )}
@@ -278,24 +370,9 @@ export default function ChestQuestionPage() {
             ← Back to Chests
           </button>
           
-          {isCorrectAnswer && (
-            <button
-              onClick={handleSubmitAnswer}
-              style={{
-                background: "#28a745",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                padding: "12px 24px",
-                fontWeight: "bold",
-                cursor: "pointer",
-                fontSize: "1rem",
-                boxShadow: "0 4px 8px rgba(40,167,69,0.3)"
-              }}
-            >
-              Submit Answer ✓
-            </button>
-          )}
+          {/* Submit button removed: attempts counted per click now */}
+          
+          {/* Completed state button removed per requirement (auto-redirect still occurs). */}
         </div>
       </div>
     </div>
