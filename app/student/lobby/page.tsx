@@ -6,12 +6,14 @@ import { io, Socket } from "socket.io-client";
 interface Student {
   name: string;
   section: string;
+  group?: number;
+  role?: string;
 }
 
 export default function StudentLobby() {
   const router = useRouter();
   const [students, setStudents] = useState<Student[]>([]);
-  const [socket, setSocket] = useState<Socket | null>(null);
+  const [, setSocket] = useState<Socket | null>(null); 
 
   useEffect(() => {
     const s = io("http://localhost:3000");
@@ -121,7 +123,11 @@ export default function StudentLobby() {
           Students in Lobby
         </h2>
         <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-          {students.map((s, i) => (
+          {students
+            .filter(s => (s.role ? s.role === 'student' : true))
+            .slice()
+            .sort((a,b)=> (a.group || 0) - (b.group || 0))
+            .map((s, i) => (
             <li
               key={i}
               style={{
@@ -130,9 +136,21 @@ export default function StudentLobby() {
                 fontSize: "1rem",
                 marginBottom: "8px",
                 textAlign: "center",
+                position: 'relative'
               }}
             >
               {s.name} <span style={{ color: "#b80f2c" }}>[{s.section}]</span>
+              {s.group && (
+                <span style={{
+                  display: 'inline-block',
+                  marginLeft: 8,
+                  background: `hsl(${(s.group * 57)%360} 70% 45%)`,
+                  color: '#fff',
+                  padding: '2px 8px',
+                  borderRadius: 12,
+                  fontSize: '0.65rem'
+                }}>G{s.group}</span>
+              )}
             </li>
           ))}
         </ul>

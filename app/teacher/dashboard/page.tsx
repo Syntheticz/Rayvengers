@@ -1,6 +1,5 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { io, Socket } from "socket.io-client";
 
@@ -14,10 +13,11 @@ interface LobbyStudent {
   id: string;
   name: string;
   section: string;
+  group?: number; // assigned when game starts
+  role?: string; // present from server for filtering
 }
 
 export default function TeacherDashboard() {
-  const router = useRouter();
   const [chapters, setChapters] = useState({
     c1: true,
     c2: false,
@@ -62,6 +62,10 @@ export default function TeacherDashboard() {
     s.on("lobbyUpdate", (students: LobbyStudent[]) => {
       console.log("[teacher] received lobbyUpdate", students);
       setLobbyStudents(students);
+    });
+
+    s.on('groupsAssigned', (payload: { groups: number; assignments: Record<string, number> }) => {
+      console.log('[teacher] groupsAssigned', payload);
     });
 
     s.on("gameStarted", (gameData: any) => {
@@ -318,7 +322,7 @@ export default function TeacherDashboard() {
             Live Lobby ({lobbyStudents.length})
           </h3>
           <p style={{ color: "#ddd", fontSize: 13, marginTop: 6 }}>
-            Students currently in the lobby.
+            Students currently in the lobby. Group badges appear after Start game.
           </p>
 
           {lobbyStudents.length === 0 ? (
@@ -336,27 +340,46 @@ export default function TeacherDashboard() {
             </div>
           ) : (
             <div style={{ marginTop: 16, maxHeight: 300, overflowY: "auto" }}>
-              {lobbyStudents.map((student) => (
-                <div
-                  key={student.id}
-                  style={{
-                    padding: "8px 12px",
-                    marginBottom: 8,
-                    background: "rgba(64,224,208,0.08)",
-                    borderRadius: 8,
-                    border: "1px solid rgba(64,224,208,0.15)",
-                  }}
-                >
-                  <div
-                    style={{ color: "#40e0d0", fontWeight: 600, fontSize: 14 }}
-                  >
-                    {student.name}
-                  </div>
-                  <div style={{ color: "#aaa", fontSize: 12 }}>
-                    Section {student.section} • ID: {student.id.slice(-4)}
-                  </div>
-                </div>
-              ))}
+              {lobbyStudents
+                .filter(s => (s.role ? s.role === 'student' : true))
+                .slice()
+                .sort((a,b) => (a.group || 0) - (b.group || 0))
+                .map((student) => {
+                  const groupColor = student.group ? `hsl(${(student.group * 57) % 360} 70% 35%)` : 'rgba(64,224,208,0.35)';
+                  return (
+                    <div
+                      key={student.id}
+                      style={{
+                        padding: "8px 12px",
+                        marginBottom: 8,
+                        background: "rgba(64,224,208,0.08)",
+                        borderRadius: 8,
+                        border: "1px solid rgba(64,224,208,0.15)",
+                        position: 'relative'
+                      }}
+                    >
+                      {student.group && (
+                        <div style={{
+                          position: 'absolute',
+                          top: 6,
+                          right: 6,
+                          background: groupColor,
+                          color: '#fff',
+                          padding: '2px 8px',
+                          borderRadius: 12,
+                          fontSize: 11,
+                          fontWeight: 600
+                        }}>G{student.group}</div>
+                      )}
+                      <div style={{ color: "#40e0d0", fontWeight: 600, fontSize: 14 }}>
+                        {student.name}
+                      </div>
+                      <div style={{ color: "#aaa", fontSize: 12 }}>
+                        Section {student.section} • ID: {student.id.slice(-4)}
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           )}
 
@@ -370,8 +393,32 @@ export default function TeacherDashboard() {
               color: "#40e0d0",
             }}
           >
-            🔄 Updates in real-time
+           Real-time update
           </div>
+
+          {lobbyStudents.some(s => s.group) && (
+            <div style={{ marginTop: 16 }}>
+              <h4 style={{ margin: '12px 0 4px', color: '#40e0d0', fontSize: 14 }}>Group Distribution</h4>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {Array.from(new Set(lobbyStudents.filter(s=>s.group).map(s=>s.group))).sort((a,b)=> (a||0)-(b||0)).map(g => {
+                  const members = lobbyStudents.filter(s=>s.group===g);
+                  return (
+                    <div key={g} style={{
+                      background: 'rgba(64,224,208,0.08)',
+                      border: '1px solid rgba(64,224,208,0.25)',
+                      padding: '6px 10px',
+                      borderRadius: 8,
+                      fontSize: 11,
+                      color: '#40e0d0',
+                      fontWeight: 600
+                    }}>
+                      G{g}: {members.length}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </aside>
 
         <aside

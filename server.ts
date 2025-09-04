@@ -18,20 +18,16 @@ interface LobbyStudent {
   id: string;
   name: string;
   section: string;
+  group?: number; 
+  role: string; 
 }
 
-interface Question {
-  id: string;
-  text: string;
-  options: string[];
-  correctAnswer: number;
-}
 
 interface QuestionState {
   id: string;
   status: "available" | "claimed" | "completed";
-  claimedBy?: string; // student socket ID
-  claimedByName?: string; // student name
+  claimedBy?: string; 
+  claimedByName?: string; 
   answer?: number;
   isCorrect?: boolean;
   completedAt?: Date;
@@ -53,6 +49,7 @@ const gameState: GameState = {
 };
 
 const lobby: Record<string, LobbyStudent> = {};
+const socketToUser: Record<string, string> = {};
 
 app.prepare().then(() => {
   const httpServer = createServer(handler);
@@ -101,40 +98,48 @@ app.prepare().then(() => {
     // Send user info to client
     socket.emit("userInfo", { id: user.id, name: user.name, role: user.role });
 
-    socket.emit("lobbyUpdate", Object.values(lobby));
+  socket.emit("lobbyUpdate", Object.values(lobby));
 
     socket.on("joinLobby", async (payload, ack) => {
       try {
-
-        const socketId = payload?.socketId || socket.id;
+        const roleNorm = (user.role || '').toLowerCase();
+        if (roleNorm !== 'student') {
+          console.log(`Non-student role '${user.role}' (normalized: '${roleNorm}') attempted to join lobby: ${user.name}`);
+          if (typeof ack === 'function') {
+            ack({ error: 'Only students can join lobby' });
+          } else {
+            socket.emit('joinDenied', { message: 'Only students can join lobby' });
+          }
+          return;
+        }
         const name = `${user.name}`;
         const section = user.section || ""; 
 
         console.log("received joinLobby from", socket.id, "payload:", payload);
-        lobby[socket.id] = {
+        lobby[user.id] = {
           id: user.id,
-          name: name,
-          section: section,
+          name,
+          section,
+          role: roleNorm,
+          group: lobby[user.id]?.group 
         };
+        socketToUser[socket.id] = user.id;
 
         const updated = Object.values(lobby);
         io.emit("lobbyUpdate", updated);
         console.log(
-          `Student joined: ${lobby[socket.id].name} [${
-            lobby[socket.id].section
-          }]`
+          `Student joined: ${lobby[user.id].name} [${lobby[user.id].section}]`
         );
         console.log("emitted lobbyUpdate", updated.length, "entries");
 
         if (typeof ack === "function") {
           try {
-            ack(lobby[socket.id]);
+            ack(lobby[user.id]);
           } catch (e) {
             console.warn("ack callback error", e);
           }
         } else {
-      
-          socket.emit("joined", lobby[socket.id]);
+          socket.emit("joined", lobby[user.id]);
         }
       } catch (error) {
         console.error("Error in joinLobby:", error);
@@ -144,13 +149,13 @@ app.prepare().then(() => {
       }
     });
 
-    // Handle game start from teacher
+
     socket.on("startGame", (gameData) => {
-      console.log("🎮 Teacher started game:", gameData);
+      console.log("Teacher started game:", gameData);
       console.log("📊 Current lobby students:", Object.keys(lobby));
       console.log("🔗 Total connected clients:", io.engine.clientsCount);
 
-      const lobbyStudents = Object.keys(lobby);
+  const lobbyStudents = Object.keys(lobby); 
 
       if (lobbyStudents.length === 0) {
         socket.emit("gameStartError", { message: "No students in lobby" });
@@ -162,6 +167,23 @@ app.prepare().then(() => {
       gameState.chapter = gameData.chapter || "chapter1";
       gameState.level = gameData.level || "level1";
       gameState.startedAt = new Date();
+
+      const totalGroups = Math.max(1, parseInt(gameData.groups, 10) || 1);
+  const socketIds = [...lobbyStudents];
+      for (let i = socketIds.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [socketIds[i], socketIds[j]] = [socketIds[j], socketIds[i]];
+      }
+
+      const assignment: Record<string, number> = {};
+      socketIds.forEach((sid, idx) => {
+        const groupNumber = (idx % totalGroups) + 1;
+        if (lobby[sid]) {
+          lobby[sid].group = groupNumber;
+          assignment[lobby[sid].id] = groupNumber;
+        }
+      });
+      console.log('🧮 Group assignment complete', { totalGroups, assignment });
       
 
       gameState.questionStates = {
@@ -176,19 +198,23 @@ app.prepare().then(() => {
         chapter: gameData.chapter || "chapter1",
         level: gameData.level || "level1",
         message: "Game is starting! Get ready...",
+        groups: totalGroups,
+        assignments: assignment,
       };
 
-      io.emit("gameStarted", gameStartData);
-      console.log("📤 Sent gameStarted event to all clients:", gameStartData);
+      io.emit('lobbyUpdate', Object.values(lobby));
 
-      // Send acknowledgment back to teacher
+      io.emit("gameStarted", gameStartData);
+      console.log("📤 Sent gameStarted with group assignments:", gameStartData);
+
+      io.emit('groupsAssigned', { groups: totalGroups, assignments: assignment });
+
       socket.emit("gameStartAck", {
         studentsNotified: lobbyStudents.length,
         totalClients: io.engine.clientsCount,
       });
     });
 
-    // send game state
     socket.on("getQuestions", () => {
       if (!gameState.isActive) {
         socket.emit("questionsError", { message: "No active game" });
@@ -300,8 +326,14 @@ app.prepare().then(() => {
 
     // When player disconnects
     socket.on("disconnect", () => {
-      console.log("❌ Student left:", socket.id);
-      delete lobby[socket.id];
+      const userId = socketToUser[socket.id];
+      if (userId && lobby[userId]) {
+        console.log("❌ Student left", lobby[userId].name, `(userId=${userId})`);
+        delete lobby[userId];
+      } else {
+        console.log("❌ Socket disconnected (no lobby entry)", socket.id);
+      }
+      delete socketToUser[socket.id];
       io.emit("lobbyUpdate", Object.values(lobby));
     });
   });
