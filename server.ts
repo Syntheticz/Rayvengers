@@ -41,6 +41,25 @@ interface GameState {
   questionStates: Record<string, QuestionState>;
 }
 
+const LEVEL_SEQUENCE: Record<string, string[]> = {
+  chapter1: [
+    'level1',
+    'level2',
+    'level3',
+    'level4',
+    'boss1',
+    'boss2'
+  ]
+};
+
+function getNextLevel(chapter: string, currentLevel: string): string | null {
+  const seq = LEVEL_SEQUENCE[chapter];
+  if (!seq) return null;
+  const idx = seq.indexOf(currentLevel);
+  if (idx === -1) return null;
+  return seq[idx + 1] || null;
+}
+
 const gameState: GameState = {
   isActive: false,
   chapter: "chapter1",
@@ -220,6 +239,20 @@ app.prepare().then(() => {
       const { chapter = 'chapter1', level = 'level2' } = data || {};
       console.log(`⚙️ initLevel requested -> ${chapter}/${level} by ${(socket as any).user?.name}`);
 
+      if (gameState.isActive) {
+        socket.emit('initLevelError', { message: 'Cannot start next level while current is active' });
+        return;
+      }
+      const expected = getNextLevel(gameState.chapter, gameState.level);
+      if (!expected) {
+        socket.emit('initLevelError', { message: 'No further levels defined' });
+        return;
+      }
+      if (level !== expected || chapter !== gameState.chapter) {
+        socket.emit('initLevelError', { message: `Invalid next level. Expected ${gameState.chapter}/${expected}` });
+        return;
+      }
+
       // Reset game state for new level
       gameState.isActive = true;
       gameState.chapter = chapter;
@@ -255,11 +288,13 @@ app.prepare().then(() => {
         const hasQuestions = Object.keys(gameState.questionStates).length > 0;
         const allCompleted = hasQuestions && Object.values(gameState.questionStates).every(q => q.status === 'completed');
         if (allCompleted) {
+          const nextLevel = getNextLevel(gameState.chapter, gameState.level);
           socket.emit('gameCompleted', {
             results: gameState.questionStates,
             chapter: gameState.chapter,
             level: gameState.level,
-            completedAt: gameState.startedAt?.toISOString() || new Date().toISOString()
+            completedAt: gameState.startedAt?.toISOString() || new Date().toISOString(),
+            nextLevel
           });
         } else {
           socket.emit("questionsError", { message: "No active game" });
@@ -363,11 +398,13 @@ app.prepare().then(() => {
 
       if (allCompleted) {
         gameState.isActive = false;
+        const nextLevel = getNextLevel(gameState.chapter, gameState.level);
         io.emit("gameCompleted", {
           results: gameState.questionStates,
           chapter: gameState.chapter,
-            level: gameState.level,
-          completedAt: new Date().toISOString()
+          level: gameState.level,
+          completedAt: new Date().toISOString(),
+          nextLevel
         });
         console.log(`🎉 Game completed!`);
       }

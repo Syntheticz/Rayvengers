@@ -50,7 +50,10 @@ export default function Chapter1Level1() {
 
     s.on("gameCompleted", (data) => {
       console.log("[game] Game completed:", data);
-      router.push(`/game/level-passed?chapter=${data?.chapter || 'chapter1'}&level=${data?.level || 'level1'}`);
+      const chap = data?.chapter || 'chapter1';
+      const lvl = data?.level || 'level1';
+      const next = data?.nextLevel ? `&nextLevel=${data.nextLevel}` : '';
+      router.push(`/game/level-passed?chapter=${chap}&level=${lvl}${next}`);
     });
 
     s.on('questionsError', (err) => {

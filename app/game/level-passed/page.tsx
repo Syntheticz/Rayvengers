@@ -8,6 +8,7 @@ export default function LevelPassedPage() {
   const params = useSearchParams();
   const chapter = params.get('chapter') || 'chapter1';
   const level = params.get('level') || 'level1';
+  const hintedNext = params.get('nextLevel');
   const [show, setShow] = useState(false);
   const [socket, setSocket] = useState<Socket | null>(null);
 
@@ -85,17 +86,23 @@ export default function LevelPassedPage() {
         <div style={{display:'flex', gap:16, justifyContent:'center', marginTop:40, flexWrap:'wrap'}}>
           <button
             onClick={()=> {
-              const currentNum = parseInt(level.replace(/[^0-9]/g,'') || '1', 10);
-              const nextLevel = `level${currentNum+1}`;
-              const nextPath = `/game/${chapter}/${nextLevel}`;
-              if (socket) {
-                socket.emit('initLevel', { chapter, level: nextLevel });
+              let nextLevel = hintedNext || '';
+              if (!nextLevel) {
+                // Fallback: naive increment only if it matches levelN
+                const m = level.match(/level(\d+)/);
+                if (m) nextLevel = `level${parseInt(m[1],10)+1}`; else nextLevel = '';
               }
+              if (!nextLevel) {
+                alert('No further level defined.');
+                return;
+              }
+              const nextPath = `/game/${chapter}/${nextLevel}`;
+              if (socket) socket.emit('initLevel', { chapter, level: nextLevel });
               router.push(nextPath);
             }}
             style={btnStyle('#b80f2c','#ffcc66')}
           >
-            Next Level
+            { hintedNext ? 'Next Level' : 'Continue' }
           </button>
         </div>
       </div>

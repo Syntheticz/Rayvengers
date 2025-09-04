@@ -82,7 +82,8 @@ export default function ChestQuestionPage() {
       console.log('[ChestQuestionPage] gameCompleted received', payload);
       const chap = payload?.chapter || 'chapter1';
       const lvl = payload?.level || 'level1';
-      router.push(`/game/level-passed?chapter=${chap}&level=${lvl}`);
+      const next = payload?.nextLevel ? `&nextLevel=${payload.nextLevel}` : '';
+      router.push(`/game/level-passed?chapter=${chap}&level=${lvl}${next}`);
     });
 
     return () => {
