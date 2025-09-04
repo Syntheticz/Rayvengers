@@ -50,8 +50,14 @@ export default function Chapter1Level1() {
 
     s.on("gameCompleted", (data) => {
       console.log("[game] Game completed:", data);
-      alert("🎉 All treasure chests opened! Well done adventurers!");
-      router.push("/student/lobby");
+      router.push(`/game/level-passed?chapter=${data?.chapter || 'chapter1'}&level=${data?.level || 'level1'}`);
+    });
+
+    s.on('questionsError', (err) => {
+      console.log('[game] questionsError', err);
+      // If server says no active game but we already have completed state, redirect
+      // (server also emits gameCompleted when appropriate; this is fallback)
+      router.push('/student/lobby');
     });
 
     s.on("claimError", (error) => {

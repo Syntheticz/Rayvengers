@@ -217,7 +217,18 @@ app.prepare().then(() => {
 
     socket.on("getQuestions", () => {
       if (!gameState.isActive) {
-        socket.emit("questionsError", { message: "No active game" });
+        const hasQuestions = Object.keys(gameState.questionStates).length > 0;
+        const allCompleted = hasQuestions && Object.values(gameState.questionStates).every(q => q.status === 'completed');
+        if (allCompleted) {
+          socket.emit('gameCompleted', {
+            results: gameState.questionStates,
+            chapter: gameState.chapter,
+            level: gameState.level,
+            completedAt: gameState.startedAt?.toISOString() || new Date().toISOString()
+          });
+        } else {
+          socket.emit("questionsError", { message: "No active game" });
+        }
         return;
       }
 
@@ -319,6 +330,9 @@ app.prepare().then(() => {
         gameState.isActive = false;
         io.emit("gameCompleted", {
           results: gameState.questionStates,
+          chapter: gameState.chapter,
+            level: gameState.level,
+          completedAt: new Date().toISOString()
         });
         console.log(`🎉 Game completed!`);
       }

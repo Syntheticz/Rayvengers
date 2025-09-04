@@ -86,13 +86,14 @@ export default function TeacherDashboard() {
     setChapters((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const saveChanges = () => {
-    const payload = { chapters, groups };
-    localStorage.setItem("teacher_dashboard_settings", JSON.stringify(payload));
-    alert(
-      "Settings saved (local). In a real app this would persist to the server."
-    );
-  };
+  useEffect(() => {
+    try {
+      const payload = { chapters, groups };
+      localStorage.setItem("teacher_dashboard_settings", JSON.stringify(payload));
+    } catch {
+      // ignore
+    }
+  }, [chapters, groups]);
 
   const startGame = () => {
     console.log("[teacher] startGame clicked");
@@ -264,19 +265,6 @@ export default function TeacherDashboard() {
           </div>
 
           <div style={{ marginTop: 28, display: "flex", gap: 12 }}>
-            <button
-              onClick={saveChanges}
-              style={{
-                background: "#ffcc66",
-                border: "none",
-                padding: "10px 16px",
-                borderRadius: 10,
-                cursor: "pointer",
-                fontWeight: 700,
-              }}
-            >
-              Save changes
-            </button>
             <button
               onClick={startGame}
               style={{
