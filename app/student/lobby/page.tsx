@@ -2,77 +2,54 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { io, Socket } from "socket.io-client";
-
-interface Student {
-  name: string;
-  section: string;
-  group?: number;
-  role?: string;
-}
+import { useSocket } from "@/lib/providers/socket-provider";
+import { LobbyStudent } from "@/server";
 
 export default function StudentLobby() {
   const router = useRouter();
-  const [students, setStudents] = useState<Student[]>([]);
-  const [, setSocket] = useState<Socket | null>(null); 
+  const { socket, students, joinLobby } = useSocket();
 
   useEffect(() => {
-    const s = io("http://localhost:3000");
-    setSocket(s);
+    if (!socket) return;
 
-    console.log("[lobby] attempting socket connect to http://localhost:3000");
+    console.log("[lobby] attempting socket connect with socket:", socket);
 
-    s.on("connect", () => {
-      console.log("[lobby] connected", s.id);
-      s.emit(
-        "joinLobby",
-        {
-          socketId: s.id,
-        },
-        (ackPayload: any) => {
-          console.log("[lobby] joinLobby ack:", ackPayload);
-        }
-      );
+    // ✅ This is the correct event name
+    socket.on("connect", () => {
+      console.log("[lobby] ✅ connected to server");
+
+      joinLobby();
     });
 
-    s.on("lobbyUpdate", (data: Student[]) => {
-      console.log("[lobby] received lobbyUpdate", data);
-      setStudents(data);
-    });
-
-    s.on("testEvent", (data: any) => {
-      console.log("[lobby] 📡 TEST EVENT RECEIVED:", data);
-    });
-
-    s.on("gameStarted", (gameData: any) => {
+    // Game started event
+    socket.on("gameStarted", (gameData: any) => {
       console.log("[lobby] 🎮 GAME STARTED EVENT RECEIVED!", gameData);
       const redirectPath = `/game/${gameData.chapter || "chapter1"}`;
       console.log("[lobby] Redirecting to:", redirectPath);
 
-      // Add a small delay to ensure the log is visible
       setTimeout(() => {
         console.log("[lobby] Executing router.push to:", redirectPath);
         router.push(redirectPath);
       }, 100);
     });
 
-    s.on("joined", (payload: any) => {
-      console.log("[lobby] joined ack:", payload);
+    // Handle disconnect
+    socket.on("disconnect", (reason: any) => {
+      console.log("[lobby] ❌ Disconnected:", reason);
     });
 
-    // Add error handling
-    s.on("connect_error", (error: any) => {
-      console.error("[lobby] Connection error:", error);
-    });
-
-    s.on("disconnect", (reason: any) => {
-      console.log("[lobby] Disconnected:", reason);
+    socket.on("connect_error", (error: any) => {
+      console.error("[lobby] ⚠️ Connection error:", error);
     });
 
     return () => {
-      console.log("[lobby] Cleaning up socket connection");
-      s.disconnect();
+      console.log("[lobby] Cleaning up socket listeners");
+      socket.off("connect");
+      socket.off("disconnect");
+      socket.off("connect_error");
+      socket.off("gameStarted");
     };
-  }, [router]);
+  }, [socket]);
 
   return (
     <div
@@ -124,35 +101,39 @@ export default function StudentLobby() {
         </h2>
         <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
           {students
-            .filter(s => (s.role ? s.role === 'student' : true))
+            .filter((s) => (s.role ? s.role === "student" : true))
             .slice()
-            .sort((a,b)=> (a.group || 0) - (b.group || 0))
+            .sort((a, b) => (a.group || 0) - (b.group || 0))
             .map((s, i) => (
-            <li
-              key={i}
-              style={{
-                fontFamily: "'Press Start 2P', cursive",
-                color: "#333",
-                fontSize: "1rem",
-                marginBottom: "8px",
-                textAlign: "center",
-                position: 'relative'
-              }}
-            >
-              {s.name} <span style={{ color: "#b80f2c" }}>[{s.section}]</span>
-              {s.group && (
-                <span style={{
-                  display: 'inline-block',
-                  marginLeft: 8,
-                  background: `hsl(${(s.group * 57)%360} 70% 45%)`,
-                  color: '#fff',
-                  padding: '2px 8px',
-                  borderRadius: 12,
-                  fontSize: '0.65rem'
-                }}>G{s.group}</span>
-              )}
-            </li>
-          ))}
+              <li
+                key={i}
+                style={{
+                  fontFamily: "'Press Start 2P', cursive",
+                  color: "#333",
+                  fontSize: "1rem",
+                  marginBottom: "8px",
+                  textAlign: "center",
+                  position: "relative",
+                }}
+              >
+                {s.name} <span style={{ color: "#b80f2c" }}>[{s.section}]</span>
+                {s.group && (
+                  <span
+                    style={{
+                      display: "inline-block",
+                      marginLeft: 8,
+                      background: `hsl(${(s.group * 57) % 360} 70% 45%)`,
+                      color: "#fff",
+                      padding: "2px 8px",
+                      borderRadius: 12,
+                      fontSize: "0.65rem",
+                    }}
+                  >
+                    G{s.group}
+                  </span>
+                )}
+              </li>
+            ))}
         </ul>
       </div>
       <button

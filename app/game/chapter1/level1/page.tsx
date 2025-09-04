@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { io } from "socket.io-client";
 import Image from "next/image";
+import { useSocket } from "@/lib/providers/socket-provider";
 
 interface QuestionState {
   id: string;
@@ -21,21 +22,22 @@ export default function Chapter1Level1() {
     Record<string, QuestionState>
   >({});
   const [loading, setLoading] = useState(true);
+  const { socket } = useSocket();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    const s = io("http://localhost:3000");
+    if (!socket) return;
 
-    s.on("connect", () => {
+    socket.on("connect", () => {
       console.log("[game] Connected to game server");
-      s.emit("getQuestions");
+      socket.emit("getQuestions");
     });
 
-    s.on("userInfo", (userInfo) => {
+    socket.on("userInfo", (userInfo) => {
       setCurrentUserId(userInfo.id);
     });
 
-    s.on(
+    socket.on(
       "questionsUpdate",
       (data: { questionStates: Record<string, QuestionState> }) => {
         console.log("[game] Question states updated:", data);
@@ -44,34 +46,37 @@ export default function Chapter1Level1() {
       }
     );
 
-    s.on("answerResult", (data: { questionId: string; isCorrect: boolean }) => {
-      console.log("[game] Answer result:", data);
-    });
+    socket.on(
+      "answerResult",
+      (data: { questionId: string; isCorrect: boolean }) => {
+        console.log("[game] Answer result:", data);
+      }
+    );
 
-    s.on("gameCompleted", (data) => {
+    socket.on("gameCompleted", (data) => {
       console.log("[game] Game completed:", data);
-      router.push(`/game/level-passed?chapter=${data?.chapter || 'chapter1'}&level=${data?.level || 'level1'}`);
+      router.push(
+        `/game/level-passed?chapter=${data?.chapter || "chapter1"}&level=${
+          data?.level || "level1"
+        }`
+      );
     });
 
-    s.on('questionsError', (err) => {
-      console.log('[game] questionsError', err);
+    socket.on("questionsError", (err) => {
+      console.log("[game] questionsError", err);
       // If server says no active game but we already have completed state, redirect
       // (server also emits gameCompleted when appropriate; this is fallback)
-      router.push('/student/lobby');
+      router.push("/student/lobby");
     });
 
-    s.on("claimError", (error) => {
+    socket.on("claimError", (error) => {
       alert(error.message);
     });
 
-    s.on("submitError", (error) => {
+    socket.on("submitError", (error) => {
       alert(error.message);
     });
-
-    return () => {
-      s.disconnect();
-    };
-  }, [router]);
+  }, [socket]);
 
   const handleBackToLobby = () => {
     router.push("/student/lobby");

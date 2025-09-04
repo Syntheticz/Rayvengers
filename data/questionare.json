@@ -1,0 +1,30 @@
+[
+  {
+    "questionId": "1",
+    "chapterId": "1",
+    "questionTitle": "Concave Mirror - Focal Point",
+    "description": "Click on the focal point (F) in the diagram",
+    "answer": "focal-point"
+  },
+  {
+    "questionId": "2",
+    "chapterId": "1",
+    "questionTitle": "Concave Mirror - Center of Curvature",
+    "description": "Click on the center of curvature (C) in the diagram",
+    "answer": "center-curvature"
+  },
+  {
+    "questionId": "3",
+    "chapterId": "1",
+    "questionTitle": "Concave Mirror - Principal Axis",
+    "description": "Click on the principal axis in the diagram",
+    "answer": "principal-axis"
+  },
+  {
+    "questionId": "4",
+    "chapterId": "1",
+    "questionTitle": "Concave Mirror - Mirror Surface",
+    "description": "Click on the concave mirror surface in the diagram",
+    "answer": "concave-mirror"
+  }
+]

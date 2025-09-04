@@ -28,9 +28,9 @@ export default function StudentGuide() {
       <button
         onClick={async () => {
           try {
-            await signOut({ 
+            await signOut({
               redirect: false,
-              callbackUrl: "/"
+              callbackUrl: "/",
             });
             window.location.href = "/";
           } catch (error) {
@@ -58,7 +58,9 @@ export default function StudentGuide() {
       </button>
       <Slider
         slides={slides}
-        onLastNext={() => router.push("/student/lobby")}
+        onLastNext={() => {
+          location.href = "/student/lobby";
+        }}
       />
     </main>
   );

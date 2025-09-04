@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
 import { io, Socket } from "socket.io-client";
+import { useSocket } from "@/lib/providers/socket-provider";
 
 interface LeaderboardRow {
   rank: number;
@@ -24,8 +25,8 @@ export default function TeacherDashboard() {
     c3: false,
   });
   const [groups, setGroups] = useState(4);
-  const [lobbyStudents, setLobbyStudents] = useState<LobbyStudent[]>([]);
-  const [socket, setSocket] = useState<Socket | null>(null);
+
+  const { socket, students: lobbyStudents } = useSocket();
   const [leaderboard] = useState<LeaderboardRow[]>([
     { rank: 1, team: "Team A", score: 980 },
     { rank: 2, team: "Team B", score: 870 },
@@ -49,38 +50,44 @@ export default function TeacherDashboard() {
 
   // Socket connection for lobby monitoring
   useEffect(() => {
-    const s = io("http://localhost:3000");
-    setSocket(s);
+    if (!socket) return;
 
     console.log("[teacher] connecting to lobby socket");
 
-    s.on("connect", () => {
-      console.log("[teacher] connected to lobby", s.id);
-      // Don't emit joinLobby for teachers - they're observers only
-    });
+    const handleConnect = () => {
+      console.log("[teacher] connected to lobby", socket.id);
+      // Teacher does NOT emit joinLobby (observer only)
+    };
 
-    s.on("lobbyUpdate", (students: LobbyStudent[]) => {
-      console.log("[teacher] received lobbyUpdate", students);
-      setLobbyStudents(students);
-    });
+    const handleGroupsAssigned = (payload: {
+      groups: number;
+      assignments: Record<string, number>;
+    }) => {
+      console.log("[teacher] groupsAssigned", payload);
+    };
 
-    s.on('groupsAssigned', (payload: { groups: number; assignments: Record<string, number> }) => {
-      console.log('[teacher] groupsAssigned', payload);
-    });
-
-    s.on("gameStarted", (gameData: any) => {
+    const handleGameStarted = (gameData: any) => {
       console.log("[teacher] game started confirmation:", gameData);
-      // Teacher can receive confirmation but doesn't redirect
-    });
+      // Teacher sees confirmation but doesn’t redirect
+    };
 
-    s.on("gameStartAck", (ackData: any) => {
+    const handleGameStartAck = (ackData: any) => {
       console.log("[teacher] received game start acknowledgment:", ackData);
-    });
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on("groupsAssigned", handleGroupsAssigned);
+    socket.on("gameStarted", handleGameStarted);
+    socket.on("gameStartAck", handleGameStartAck);
 
     return () => {
-      s.disconnect();
+      console.log("[teacher] cleaning up listeners");
+      socket.off("connect", handleConnect);
+      socket.off("groupsAssigned", handleGroupsAssigned);
+      socket.off("gameStarted", handleGameStarted);
+      socket.off("gameStartAck", handleGameStartAck);
     };
-  }, []);
+  }, [socket]);
 
   const toggleChapter = (key: keyof typeof chapters) => {
     setChapters((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -89,7 +96,10 @@ export default function TeacherDashboard() {
   useEffect(() => {
     try {
       const payload = { chapters, groups };
-      localStorage.setItem("teacher_dashboard_settings", JSON.stringify(payload));
+      localStorage.setItem(
+        "teacher_dashboard_settings",
+        JSON.stringify(payload)
+      );
     } catch {
       // ignore
     }
@@ -310,7 +320,8 @@ export default function TeacherDashboard() {
             Live Lobby ({lobbyStudents.length})
           </h3>
           <p style={{ color: "#ddd", fontSize: 13, marginTop: 6 }}>
-            Students currently in the lobby. Group badges appear after Start game.
+            Students currently in the lobby. Group badges appear after Start
+            game.
           </p>
 
           {lobbyStudents.length === 0 ? (
@@ -329,11 +340,13 @@ export default function TeacherDashboard() {
           ) : (
             <div style={{ marginTop: 16, maxHeight: 300, overflowY: "auto" }}>
               {lobbyStudents
-                .filter(s => (s.role ? s.role === 'student' : true))
+                .filter((s) => (s.role ? s.role === "student" : true))
                 .slice()
-                .sort((a,b) => (a.group || 0) - (b.group || 0))
+                .sort((a, b) => (a.group || 0) - (b.group || 0))
                 .map((student) => {
-                  const groupColor = student.group ? `hsl(${(student.group * 57) % 360} 70% 35%)` : 'rgba(64,224,208,0.35)';
+                  const groupColor = student.group
+                    ? `hsl(${(student.group * 57) % 360} 70% 35%)`
+                    : "rgba(64,224,208,0.35)";
                   return (
                     <div
                       key={student.id}
@@ -343,23 +356,33 @@ export default function TeacherDashboard() {
                         background: "rgba(64,224,208,0.08)",
                         borderRadius: 8,
                         border: "1px solid rgba(64,224,208,0.15)",
-                        position: 'relative'
+                        position: "relative",
                       }}
                     >
                       {student.group && (
-                        <div style={{
-                          position: 'absolute',
-                          top: 6,
-                          right: 6,
-                          background: groupColor,
-                          color: '#fff',
-                          padding: '2px 8px',
-                          borderRadius: 12,
-                          fontSize: 11,
-                          fontWeight: 600
-                        }}>G{student.group}</div>
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: 6,
+                            right: 6,
+                            background: groupColor,
+                            color: "#fff",
+                            padding: "2px 8px",
+                            borderRadius: 12,
+                            fontSize: 11,
+                            fontWeight: 600,
+                          }}
+                        >
+                          G{student.group}
+                        </div>
                       )}
-                      <div style={{ color: "#40e0d0", fontWeight: 600, fontSize: 14 }}>
+                      <div
+                        style={{
+                          color: "#40e0d0",
+                          fontWeight: 600,
+                          fontSize: 14,
+                        }}
+                      >
                         {student.name}
                       </div>
                       <div style={{ color: "#aaa", fontSize: 12 }}>
@@ -381,29 +404,42 @@ export default function TeacherDashboard() {
               color: "#40e0d0",
             }}
           >
-           Real-time update
+            Real-time update
           </div>
 
-          {lobbyStudents.some(s => s.group) && (
+          {lobbyStudents.some((s) => s.group) && (
             <div style={{ marginTop: 16 }}>
-              <h4 style={{ margin: '12px 0 4px', color: '#40e0d0', fontSize: 14 }}>Group Distribution</h4>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {Array.from(new Set(lobbyStudents.filter(s=>s.group).map(s=>s.group))).sort((a,b)=> (a||0)-(b||0)).map(g => {
-                  const members = lobbyStudents.filter(s=>s.group===g);
-                  return (
-                    <div key={g} style={{
-                      background: 'rgba(64,224,208,0.08)',
-                      border: '1px solid rgba(64,224,208,0.25)',
-                      padding: '6px 10px',
-                      borderRadius: 8,
-                      fontSize: 11,
-                      color: '#40e0d0',
-                      fontWeight: 600
-                    }}>
-                      G{g}: {members.length}
-                    </div>
-                  );
-                })}
+              <h4
+                style={{ margin: "12px 0 4px", color: "#40e0d0", fontSize: 14 }}
+              >
+                Group Distribution
+              </h4>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {Array.from(
+                  new Set(
+                    lobbyStudents.filter((s) => s.group).map((s) => s.group)
+                  )
+                )
+                  .sort((a, b) => (a || 0) - (b || 0))
+                  .map((g) => {
+                    const members = lobbyStudents.filter((s) => s.group === g);
+                    return (
+                      <div
+                        key={g}
+                        style={{
+                          background: "rgba(64,224,208,0.08)",
+                          border: "1px solid rgba(64,224,208,0.25)",
+                          padding: "6px 10px",
+                          borderRadius: 8,
+                          fontSize: 11,
+                          color: "#40e0d0",
+                          fontWeight: 600,
+                        }}
+                      >
+                        G{g}: {members.length}
+                      </div>
+                    );
+                  })}
               </div>
             </div>
           )}

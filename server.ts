@@ -4,6 +4,49 @@ import { Server } from "socket.io";
 import { PrismaClient } from "@prisma/client";
 import { parse } from "path";
 import { getToken } from "next-auth/jwt";
+export interface LobbyStudent {
+  id: string;
+  name: string;
+  section: string;
+  role: string;
+}
+
+export interface GameState {
+  id: string; // unique per game session
+  isActive: boolean;
+  chapter: string;
+  level: string;
+  startedAt?: Date;
+  questionStates: Record<string, QuestionState>;
+  players: string[]; // student ids assigned to this game
+}
+
+// Store lobby students
+export interface LobbyStudent {
+  id: string;
+  name: string;
+  section: string;
+  group?: number;
+  role: string;
+}
+
+export interface QuestionState {
+  id: string;
+  status: "available" | "claimed" | "completed";
+  claimedBy?: string;
+  claimedByName?: string;
+  answer?: number;
+  isCorrect?: boolean;
+  completedAt?: Date;
+}
+
+export interface GameState {
+  isActive: boolean;
+  chapter: string;
+  level: string;
+  startedAt?: Date;
+  questionStates: Record<string, QuestionState>;
+}
 
 const prisma = new PrismaClient();
 
@@ -13,42 +56,20 @@ const port = 3000;
 const app = next({ dev, hostname, port });
 const handler = app.getRequestHandler();
 
-// Store lobby students
-interface LobbyStudent {
-  id: string;
-  name: string;
-  section: string;
-  group?: number; 
-  role: string; 
-}
-
-
-interface QuestionState {
-  id: string;
-  status: "available" | "claimed" | "completed";
-  claimedBy?: string; 
-  claimedByName?: string; 
-  answer?: number;
-  isCorrect?: boolean;
-  completedAt?: Date;
-}
-
-interface GameState {
-  isActive: boolean;
-  chapter: string;
-  level: string;
-  startedAt?: Date;
-  questionStates: Record<string, QuestionState>;
-}
-
 const gameState: GameState = {
   isActive: false,
   chapter: "chapter1",
   level: "level1",
-  questionStates: {}
+  questionStates: {},
+  id: "",
+  players: [],
+  startedAt: new Date(Date.now()),
 };
 
-const lobby: Record<string, LobbyStudent> = {};
+const waitingLobby: Record<string, LobbyStudent> = {};
+const activeGameLobby: Record<string, LobbyStudent> = {};
+const gameSessions: Record<string, GameState> = {}; // active games
+
 const socketToUser: Record<string, string> = {};
 
 app.prepare().then(() => {
@@ -64,7 +85,7 @@ app.prepare().then(() => {
         cookies: parse(socket.handshake.headers.cookie || ""),
       } as any;
 
-      console.log("🍪 Cookies received:", req.cookies);
+      // console.log("🍪 Cookies received:", req.cookies);
 
       const token = await getToken({
         req,
@@ -98,133 +119,105 @@ app.prepare().then(() => {
     // Send user info to client
     socket.emit("userInfo", { id: user.id, name: user.name, role: user.role });
 
-  socket.emit("lobbyUpdate", Object.values(lobby));
+    socket.emit("lobbyUpdate", Object.values(waitingLobby));
 
-    socket.on("joinLobby", async (payload, ack) => {
-      try {
-        const roleNorm = (user.role || '').toLowerCase();
-        if (roleNorm !== 'student') {
-          console.log(`Non-student role '${user.role}' (normalized: '${roleNorm}') attempted to join lobby: ${user.name}`);
-          if (typeof ack === 'function') {
-            ack({ error: 'Only students can join lobby' });
-          } else {
-            socket.emit('joinDenied', { message: 'Only students can join lobby' });
-          }
-          return;
-        }
-        const name = `${user.name}`;
-        const section = user.section || ""; 
+    socket.on("getLobby", (ack) => {
+      console.log("📥 getLobby called by client", socket.id);
 
-        console.log("received joinLobby from", socket.id, "payload:", payload);
-        lobby[user.id] = {
-          id: user.id,
-          name,
-          section,
-          role: roleNorm,
-          group: lobby[user.id]?.group 
-        };
-        socketToUser[socket.id] = user.id;
-
-        const updated = Object.values(lobby);
-        io.emit("lobbyUpdate", updated);
-        console.log(
-          `Student joined: ${lobby[user.id].name} [${lobby[user.id].section}]`
-        );
-        console.log("emitted lobbyUpdate", updated.length, "entries");
-
-        if (typeof ack === "function") {
-          try {
-            ack(lobby[user.id]);
-          } catch (e) {
-            console.warn("ack callback error", e);
-          }
-        } else {
-          socket.emit("joined", lobby[user.id]);
-        }
-      } catch (error) {
-        console.error("Error in joinLobby:", error);
-        if (typeof ack === "function") {
-          ack({ error: "Failed to join lobby" });
-        }
+      if (typeof ack === "function") {
+        const data = Object.values(waitingLobby);
+        console.log("📤 sending lobby data back:", data.length, "students");
+        ack(data); // <-- respond directly to the client
       }
     });
 
+    socket.on("joinLobby", (payload, ack) => {
+      console.log("🎯 [joinLobby] Event received");
+      console.log("   ↳ Payload:", payload);
+      console.log("   ↳ User:", user);
 
-    socket.on("startGame", (gameData) => {
-      console.log("Teacher started game:", gameData);
-      console.log("📊 Current lobby students:", Object.keys(lobby));
-      console.log("🔗 Total connected clients:", io.engine.clientsCount);
-
-  const lobbyStudents = Object.keys(lobby); 
-
-      if (lobbyStudents.length === 0) {
-        socket.emit("gameStartError", { message: "No students in lobby" });
+      const roleNorm = (user.role || "").toLowerCase();
+      if (roleNorm !== "student") {
+        console.warn(
+          "⚠️ [joinLobby] Blocked non-student user:",
+          user.id,
+          user.role
+        );
         return;
       }
 
-  
+      // Add student to waiting lobby
+      waitingLobby[user.id] = {
+        id: user.id,
+        name: user.name,
+        section: user.section,
+        role: roleNorm,
+      };
+
+      socketToUser[socket.id] = user.id;
+
+      console.log(
+        "✅ [joinLobby] Student added to waiting lobby:",
+        waitingLobby[user.id]
+      );
+      console.log("   ↳ Current waitingLobby:", Object.values(waitingLobby));
+      console.log("   ↳ socketToUser:", socketToUser);
+
+      io.emit("waitingLobbyUpdate", Object.values(waitingLobby));
+      console.log("📡 [joinLobby] waitingLobbyUpdate emitted");
+
+      if (ack) {
+        console.log("📨 [joinLobby] Sending ack back to client");
+        ack(waitingLobby[user.id]);
+      }
+    });
+
+    socket.on("startGame", (gameData) => {
+      const lobbyStudents = Object.values(waitingLobby);
+
+      if (lobbyStudents.length === 0) {
+        socket.emit("gameStartError", {
+          message: "No students in waiting lobby",
+        });
+        return;
+      }
+
+      // Move waiting students into active game
+      for (const student of lobbyStudents) {
+        activeGameLobby[student.id] = student;
+      }
+      Object.keys(waitingLobby).forEach((id) => delete waitingLobby[id]);
+
+      // Assign groups, init gameState, etc.
       gameState.isActive = true;
       gameState.chapter = gameData.chapter || "chapter1";
       gameState.level = gameData.level || "level1";
-      gameState.startedAt = new Date();
 
-      const totalGroups = Math.max(1, parseInt(gameData.groups, 10) || 1);
-  const socketIds = [...lobbyStudents];
-      for (let i = socketIds.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [socketIds[i], socketIds[j]] = [socketIds[j], socketIds[i]];
-      }
-
-      const assignment: Record<string, number> = {};
-      socketIds.forEach((sid, idx) => {
-        const groupNumber = (idx % totalGroups) + 1;
-        if (lobby[sid]) {
-          lobby[sid].group = groupNumber;
-          assignment[lobby[sid].id] = groupNumber;
-        }
+      io.emit("gameStarted", {
+        students: Object.values(activeGameLobby),
+        chapter: gameState.chapter,
+        level: gameState.level,
       });
-      console.log('🧮 Group assignment complete', { totalGroups, assignment });
-      
 
-      gameState.questionStates = {
-        "chest1": { id: "chest1", status: "available" },
-        "chest2": { id: "chest2", status: "available" },
-        "chest3": { id: "chest3", status: "available" },
-        "chest4": { id: "chest4", status: "available" }
-      };
-
-      // Notify all students in lobby to start the game
-      const gameStartData = {
-        chapter: gameData.chapter || "chapter1",
-        level: gameData.level || "level1",
-        message: "Game is starting! Get ready...",
-        groups: totalGroups,
-        assignments: assignment,
-      };
-
-      io.emit('lobbyUpdate', Object.values(lobby));
-
-      io.emit("gameStarted", gameStartData);
-      console.log("📤 Sent gameStarted with group assignments:", gameStartData);
-
-      io.emit('groupsAssigned', { groups: totalGroups, assignments: assignment });
-
-      socket.emit("gameStartAck", {
-        studentsNotified: lobbyStudents.length,
-        totalClients: io.engine.clientsCount,
-      });
+      // Update teacher’s view
+      io.emit("gameLobbyUpdate", Object.values(activeGameLobby));
     });
 
     socket.on("getQuestions", () => {
       if (!gameState.isActive) {
         const hasQuestions = Object.keys(gameState.questionStates).length > 0;
-        const allCompleted = hasQuestions && Object.values(gameState.questionStates).every(q => q.status === 'completed');
+        const allCompleted =
+          hasQuestions &&
+          Object.values(gameState.questionStates).every(
+            (q) => q.status === "completed"
+          );
         if (allCompleted) {
-          socket.emit('gameCompleted', {
+          socket.emit("gameCompleted", {
             results: gameState.questionStates,
             chapter: gameState.chapter,
             level: gameState.level,
-            completedAt: gameState.startedAt?.toISOString() || new Date().toISOString()
+            completedAt:
+              gameState.startedAt?.toISOString() || new Date().toISOString(),
           });
         } else {
           socket.emit("questionsError", { message: "No active game" });
@@ -252,18 +245,23 @@ app.prepare().then(() => {
         socket.emit("claimError", { message: "Question not found" });
         return;
       }
-      if (questionState.status !== "available" && 
-          (questionState.status !== "claimed" || questionState.claimedBy !== user.id)) {
+      if (
+        questionState.status !== "available" &&
+        (questionState.status !== "claimed" ||
+          questionState.claimedBy !== user.id)
+      ) {
         socket.emit("claimError", { message: "Question not available" });
         return;
       }
 
       // Claim the question (or re-claim if it's the same user)
       questionState.status = "claimed";
-      questionState.claimedBy = user.id; 
+      questionState.claimedBy = user.id;
       questionState.claimedByName = user.name;
 
-      console.log(`📝 Question ${questionId} claimed by ${questionState.claimedByName} (${user.id})`);
+      console.log(
+        `📝 Question ${questionId} claimed by ${questionState.claimedByName} (${user.id})`
+      );
 
       // Broadcast updated state to all connected students
       io.emit("questionsUpdate", {
@@ -293,22 +291,28 @@ app.prepare().then(() => {
 
       let isCorrect = false;
       if (questionId === "chest1" && answer === "focal-point") isCorrect = true;
-      if (questionId === "chest2" && answer === "center-curvature") isCorrect = true;
-      if (questionId === "chest3" && answer === "principal-axis") isCorrect = true;
-      if (questionId === "chest4" && answer === "concave-mirror") isCorrect = true;
+      if (questionId === "chest2" && answer === "center-curvature")
+        isCorrect = true;
+      if (questionId === "chest3" && answer === "principal-axis")
+        isCorrect = true;
+      if (questionId === "chest4" && answer === "concave-mirror")
+        isCorrect = true;
 
       questionState.status = "completed";
       questionState.answer = answer;
       questionState.isCorrect = isCorrect;
       questionState.completedAt = new Date();
 
-      console.log(`✅ ${user.name} ${isCorrect ? 'correctly' : 'incorrectly'} answered ${questionId}: ${answer}`);
+      console.log(
+        `✅ ${user.name} ${
+          isCorrect ? "correctly" : "incorrectly"
+        } answered ${questionId}: ${answer}`
+      );
 
       // Broadcast to students
       io.emit("questionsUpdate", {
         questionStates: gameState.questionStates,
       });
-
 
       socket.emit("answerResult", {
         questionId,
@@ -331,24 +335,51 @@ app.prepare().then(() => {
         io.emit("gameCompleted", {
           results: gameState.questionStates,
           chapter: gameState.chapter,
-            level: gameState.level,
-          completedAt: new Date().toISOString()
+          level: gameState.level,
+          completedAt: new Date().toISOString(),
         });
         console.log(`🎉 Game completed!`);
       }
     });
 
-    // When player disconnects
+    socket.on("endGame", () => {
+      gameState.isActive = false;
+      Object.keys(activeGameLobby).forEach((id) => delete activeGameLobby[id]);
+
+      io.emit("gameEnded", { message: "Game session ended" });
+      io.emit("waitingLobbyUpdate", Object.values(waitingLobby));
+    });
+
     socket.on("disconnect", () => {
       const userId = socketToUser[socket.id];
-      if (userId && lobby[userId]) {
-        console.log("❌ Student left", lobby[userId].name, `(userId=${userId})`);
-        delete lobby[userId];
-      } else {
-        console.log("❌ Socket disconnected (no lobby entry)", socket.id);
+
+      if (!userId) {
+        console.log("❌ Socket disconnected (no userId)", socket.id);
+        return;
       }
+
+      // 1. If student was in waiting lobby
+      if (waitingLobby[userId]) {
+        console.log(
+          "❌ Student left waiting lobby:",
+          waitingLobby[userId].name
+        );
+        delete waitingLobby[userId];
+        io.emit("waitingLobbyUpdate", Object.values(waitingLobby));
+      }
+
+      // 2. If student was in active game lobby
+      else if (activeGameLobby[userId]) {
+        console.log(
+          "❌ Student left active game lobby:",
+          activeGameLobby[userId].name
+        );
+        delete activeGameLobby[userId];
+        io.emit("gameLobbyUpdate", Object.values(activeGameLobby));
+      }
+
+      // 3. Clean up reference
       delete socketToUser[socket.id];
-      io.emit("lobbyUpdate", Object.values(lobby));
     });
   });
 
