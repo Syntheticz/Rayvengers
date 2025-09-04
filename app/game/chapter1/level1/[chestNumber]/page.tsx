@@ -119,11 +119,9 @@ export default function ChestQuestionPage() {
 
     if (isCorrect) {
       setIsCompleted(true);
-  // Auto-redirect removed per requirement; user can navigate back manually.
     }
   };
 
-  // Debug: attempts change watcher
   useEffect(() => {
     console.log('[attempts] state changed ->', attempts);
   }, [attempts]);
@@ -369,10 +367,8 @@ export default function ChestQuestionPage() {
           >
             ← Back to Chests
           </button>
-          
-          {/* Submit button removed: attempts counted per click now */}
-          
-          {/* Completed state button removed per requirement (auto-redirect still occurs). */}
+        
+        
         </div>
       </div>
     </div>
