@@ -215,6 +215,41 @@ app.prepare().then(() => {
       });
     });
 
+    // Initialize a subsequent level (e.g., from level-passed screen)
+    socket.on("initLevel", (data) => {
+      const { chapter = 'chapter1', level = 'level2' } = data || {};
+      console.log(`⚙️ initLevel requested -> ${chapter}/${level} by ${(socket as any).user?.name}`);
+
+      // Reset game state for new level
+      gameState.isActive = true;
+      gameState.chapter = chapter;
+      gameState.level = level;
+      gameState.startedAt = new Date();
+      gameState.questionStates = {
+        "chest1": { id: "chest1", status: "available" },
+        "chest2": { id: "chest2", status: "available" },
+        "chest3": { id: "chest3", status: "available" },
+        "chest4": { id: "chest4", status: "available" }
+      };
+
+      // Reuse existing group assignments if present
+      const assignments: Record<string, number> = {};
+      Object.values(lobby).forEach(ls => {
+        if (ls.group) assignments[ls.id] = ls.group;
+      });
+      const groups = new Set(Object.values(assignments)).size || 1;
+
+      const payload = {
+        chapter,
+        level,
+        message: `Level ${level} starting!`,
+        groups,
+        assignments
+      };
+      io.emit('gameStarted', payload);
+      console.log('🚀 Level initialized', payload);
+    });
+
     socket.on("getQuestions", () => {
       if (!gameState.isActive) {
         const hasQuestions = Object.keys(gameState.questionStates).length > 0;
