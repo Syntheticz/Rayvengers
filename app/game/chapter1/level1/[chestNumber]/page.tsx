@@ -45,7 +45,7 @@ export default function ChestQuestionPage() {
 
   const { socket } = useSocket();
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [attempts, setAttempts] = useState<number>(0);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<{
@@ -68,12 +68,12 @@ export default function ChestQuestionPage() {
       return;
     }
 
-    socket.on("connect", () => {
-      console.log(`Connected to server for chest ${chestNumber}`);
-      const questionId = `chest${chestNumber}`;
-      socket.emit("claimQuestion", { questionId });
-      setLoading(false);
-    });
+    // socket.on("connect", () => {
+    //   console.log(`Connected to server for chest ${chestNumber}`);
+    //   const questionId = `chest${chestNumber}`;
+    //   socket.emit("claimQuestion", { questionId });
+    //   setLoading(false);
+    // });
 
     socket.on("gameCompleted", (payload: any) => {
       console.log("[ChestQuestionPage] gameCompleted received", payload);

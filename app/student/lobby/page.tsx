@@ -1,55 +1,68 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import {
+  getLobbies,
+  joinUserLobby,
+  removeUserFromLobby,
+  transferUserLobby,
+} from "@/lib/actions";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { io, Socket } from "socket.io-client";
-import { useSocket } from "@/lib/providers/socket-provider";
-import { LobbyStudent } from "@/server";
+import { useState } from "react";
 
-export default function StudentLobby() {
+export default function LobbyList() {
   const router = useRouter();
-  const { socket, students, joinLobby } = useSocket();
+  const session = useSession();
+  const [isAlreadyInALobby, setIsAlreadyInALobby] = useState(false);
 
-  useEffect(() => {
-    if (!socket) return;
+  const {
+    data: lobbies = [],
+    isLoading: areLobbiesLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["lobbies"],
+    queryFn: async () => {
+      const res = await getLobbies();
+      if (!res.success) throw new Error(res.error || "Failed to fetch lobbies");
+      return res.data || [];
+    },
+    refetchInterval: 3000,
+    refetchIntervalInBackground: true, // keep polling even if tab is hidden
+  });
 
-    console.log("[lobby] attempting socket connect with socket:", socket);
+  const { mutate: mjoinUserLobby } = useMutation({
+    mutationFn: joinUserLobby,
+    onSuccess: () => {
+      console.log("Successfull Operation");
+    },
+    onError: (data) => {
+      console.log("There was an error.");
+      console.log(data.message);
+    },
+  });
 
-    // ✅ This is the correct event name
-    socket.on("connect", () => {
-      console.log("[lobby] ✅ connected to server");
+  const { mutate: mtransferUserLobby } = useMutation({
+    mutationFn: transferUserLobby,
+    onSuccess: () => {
+      console.log("Successfull Operation");
+    },
+    onError: (data) => {
+      console.log("There was an error.");
+      console.log(data.message);
+    },
+  });
 
-      joinLobby();
-    });
-
-    // Game started event
-    socket.on("gameStarted", (gameData: any) => {
-      console.log("[lobby] 🎮 GAME STARTED EVENT RECEIVED!", gameData);
-      const redirectPath = `/game/${gameData.chapter || "chapter1"}`;
-      console.log("[lobby] Redirecting to:", redirectPath);
-
-      setTimeout(() => {
-        console.log("[lobby] Executing router.push to:", redirectPath);
-        router.push(redirectPath);
-      }, 100);
-    });
-
-    // Handle disconnect
-    socket.on("disconnect", (reason: any) => {
-      console.log("[lobby] ❌ Disconnected:", reason);
-    });
-
-    socket.on("connect_error", (error: any) => {
-      console.error("[lobby] ⚠️ Connection error:", error);
-    });
-
-    return () => {
-      console.log("[lobby] Cleaning up socket listeners");
-      socket.off("connect");
-      socket.off("disconnect");
-      socket.off("connect_error");
-      socket.off("gameStarted");
-    };
-  }, [socket]);
+  const { mutate: mremoveUserFromLobby } = useMutation({
+    mutationFn: removeUserFromLobby,
+    onSuccess: () => {
+      console.log("Successfull Operation");
+    },
+    onError: (data) => {
+      console.log("There was an error.");
+      console.log(data.message);
+    },
+  });
 
   return (
     <div
@@ -59,96 +72,191 @@ export default function StudentLobby() {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        justifyContent: "center",
-        padding: "32px 0",
+        justifyContent: "flex-start",
+        padding: "32px 16px",
       }}
     >
       <h1
         style={{
           fontFamily: "Bangers, cursive",
           color: "#b80f2c",
-          fontSize: "2.2rem",
+          fontSize: "2.5rem",
           fontWeight: "bold",
-          marginBottom: "18px",
+          marginBottom: "32px",
           letterSpacing: "2px",
           textAlign: "center",
         }}
       >
-        Game Lobby
+        Game Lobbies
       </h1>
+
       <div
         style={{
-          background: "#fff",
-          borderRadius: "18px",
-          boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
-          padding: "24px 32px",
-          minWidth: "260px",
-          maxWidth: "340px",
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+          gap: "24px",
           width: "100%",
-          marginBottom: "24px",
+          maxWidth: "1200px",
         }}
       >
-        <h2
-          style={{
-            fontFamily: "'Press Start 2P', cursive",
-            color: "#b80f2c",
-            fontSize: "1.1rem",
-            marginBottom: "12px",
-            textAlign: "center",
-          }}
-        >
-          Students in Lobby
-        </h2>
-        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-          {students
-            .filter((s) => (s.role ? s.role === "student" : true))
-            .slice()
-            .sort((a, b) => (a.group || 0) - (b.group || 0))
-            .map((s, i) => (
-              <li
-                key={i}
+        {lobbies.map((lobby) => (
+          <div
+            key={lobby.id}
+            style={{
+              background: "#fff",
+              borderRadius: "18px",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
+              padding: "24px",
+              position: "relative",
+              cursor: "pointer",
+              transition: "transform 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-2px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+            }}
+            onClick={() => {
+              if (isAlreadyInALobby) {
+                mtransferUserLobby({
+                  lobbyId: lobby.id,
+                  userId: session.data?.user.id || "",
+                });
+              } else {
+                mjoinUserLobby({
+                  lobbyId: lobby.id,
+                  userId: session.data?.user.id || "",
+                });
+                console.log("joined Lobby ", lobby.name);
+                setIsAlreadyInALobby(true);
+              }
+            }}
+          >
+            <div style={{ marginBottom: "16px" }}>
+              <h2
+                style={{
+                  fontFamily: "'Press Start 2P', cursive",
+                  color: "#b80f2c",
+                  fontSize: "1.1rem",
+                  marginBottom: "8px",
+                  textAlign: "center",
+                }}
+              >
+                {lobby.name}
+              </h2>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  fontSize: "0.8rem",
+                  fontFamily: "'Press Start 2P', cursive",
+                }}
+              >
+                <span style={{ color: "#666" }}>
+                  {lobby.users.length}/{lobby.maxPlayers} Players
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <h3
                 style={{
                   fontFamily: "'Press Start 2P', cursive",
                   color: "#333",
-                  fontSize: "1rem",
-                  marginBottom: "8px",
+                  fontSize: "0.8rem",
+                  marginBottom: "12px",
                   textAlign: "center",
-                  position: "relative",
                 }}
               >
-                {s.name} <span style={{ color: "#b80f2c" }}>[{s.section}]</span>
-                {s.group && (
-                  <span
-                    style={{
-                      display: "inline-block",
-                      marginLeft: 8,
-                      background: `hsl(${(s.group * 57) % 360} 70% 45%)`,
-                      color: "#fff",
-                      padding: "2px 8px",
-                      borderRadius: 12,
-                      fontSize: "0.65rem",
-                    }}
-                  >
-                    G{s.group}
-                  </span>
-                )}
-              </li>
-            ))}
-        </ul>
+                Players
+              </h3>
+              <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                {lobby.users.map((lobbyUser, i) => {
+                  console.log(lobbyUser);
+                  return (
+                    <li
+                      key={i}
+                      style={{
+                        fontFamily: "'Press Start 2P', cursive",
+                        color: "#333",
+                        fontSize: "0.7rem",
+                        marginBottom: "8px",
+                        textAlign: "center",
+                      }}
+                    >
+                      {lobbyUser.user.name}{" "}
+                      <span style={{ color: "#b80f2c" }}>
+                        [{lobbyUser.user.section}]
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {lobby.users.length < lobby.maxPlayers && (
+                <div style={{ marginTop: "8px", textAlign: "center" }}>
+                  {Array.from({
+                    length: lobby.maxPlayers - lobby.users.length,
+                  }).map((_, i) => (
+                    <div
+                      key={`empty-${i}`}
+                      style={{
+                        fontFamily: "'Press Start 2P', cursive",
+                        color: "#ccc",
+                        fontSize: "0.7rem",
+                        marginBottom: "8px",
+                        fontStyle: "italic",
+                      }}
+                    >
+                      Empty Slot
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              style={{
+                background: "#28a745",
+                color: "#fff",
+                border: "none",
+                borderRadius: "8px",
+                padding: "8px 16px",
+                fontWeight: "700",
+                fontFamily: "Bangers, cursive",
+                fontSize: "0.9rem",
+                cursor: "pointer",
+                width: "100%",
+                marginTop: "16px",
+                letterSpacing: "2px",
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log(`Joining lobby ${lobby.id}`);
+              }}
+            >
+              Join Lobby
+            </button>
+          </div>
+        ))}
       </div>
+
       <button
         onClick={() => router.push("/student/guide")}
         style={{
           background: "#b80f2c",
           color: "#ffcc66",
           border: "none",
-          borderRadius: 8,
+          borderRadius: "8px",
           padding: "12px 28px",
-          fontWeight: 700,
+          fontWeight: "700",
           fontFamily: "Bangers, cursive",
           fontSize: "1.1rem",
           cursor: "pointer",
           boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+          marginTop: "32px",
         }}
       >
         Back

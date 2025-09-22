@@ -8,6 +8,8 @@ import {
 } from "next/font/google";
 import "./globals.css";
 import { SocketProvider } from "@/lib/providers/socket-provider";
+import { SessionProvider } from "next-auth/react";
+import ReactQueryProvider from "@/lib/providers/react-query-provider";
 
 // Load fonts via next/font (auto-optimized, no FOUT, no extra <link> tags)
 const geist = Geist({
@@ -47,7 +49,11 @@ export default function RootLayout({
       <body
         className={`${geist.variable} ${geistMono.variable} ${anton.variable} ${bangers.variable} ${pressStart2P.variable} antialiased`}
       >
-        <SocketProvider>{children}</SocketProvider>
+        <SessionProvider>
+          <SocketProvider>
+            <ReactQueryProvider>{children}</ReactQueryProvider>
+          </SocketProvider>
+        </SessionProvider>
       </body>
     </html>
   );

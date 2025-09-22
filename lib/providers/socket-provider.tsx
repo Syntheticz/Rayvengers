@@ -75,10 +75,10 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       setStudents(data);
     });
 
-    return () => {
-      console.log("[SocketProvider] cleanup socket", s.id);
-      s.disconnect();
-    };
+    // return () => {
+    //   console.log("[SocketProvider] cleanup socket", s.id);
+    //   s.disconnect();
+    // };
   }, []);
 
   // helper to join lobby

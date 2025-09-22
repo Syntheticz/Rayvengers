@@ -21,7 +21,7 @@ export default function Chapter1Level1() {
   const [questionStates, setQuestionStates] = useState<
     Record<string, QuestionState>
   >({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const { socket } = useSocket();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
