@@ -28,6 +28,11 @@ export default function Chapter1Level1() {
   useEffect(() => {
     if (!socket) return;
 
+    console.log("[game] Level page mounted, emitting getQuestions");
+    
+    // Request questions immediately on mount
+    socket.emit("getQuestions");
+    
     socket.on("connect", () => {
       console.log("[game] Connected to game server");
       socket.emit("getQuestions");
@@ -41,7 +46,9 @@ export default function Chapter1Level1() {
       "questionsUpdate",
       (data: { questionStates: Record<string, QuestionState> }) => {
         console.log("[game] Question states updated:", data);
+        console.log("[game] Current questionStates before update:", questionStates);
         setQuestionStates(data.questionStates);
+        console.log("[game] QuestionStates should update now");
         setLoading(false);
       }
     );
@@ -64,17 +71,22 @@ export default function Chapter1Level1() {
 
     socket.on("questionsError", (err) => {
       console.log("[game] questionsError", err);
-      // If server says no active game but we already have completed state, redirect
-      // (server also emits gameCompleted when appropriate; this is fallback)
+      // Silently redirect to lobby if no active game
       router.push("/student/lobby");
     });
 
     socket.on("claimError", (error) => {
-      alert(error.message);
+      // Don't show "No active game" alerts (game might have just completed)
+      if (error.message !== "No active game") {
+        alert(error.message);
+      }
     });
 
     socket.on("submitError", (error) => {
-      alert(error.message);
+      // Don't show "No active game" alerts (game might have just completed)
+      if (error.message !== "No active game") {
+        alert(error.message);
+      }
     });
   }, [socket]);
 

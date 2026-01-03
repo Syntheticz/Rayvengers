@@ -8,18 +8,16 @@ import {
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useEffect } from "react";
+import { useSocket } from "@/lib/providers/socket-provider";
 
 export default function LobbyList() {
   const router = useRouter();
   const session = useSession();
-  const [isAlreadyInALobby, setIsAlreadyInALobby] = useState(false);
+  const { socket } = useSocket();
 
   const {
     data: lobbies = [],
-    isLoading: areLobbiesLoading,
-    isError,
-    error,
   } = useQuery({
     queryKey: ["lobbies"],
     queryFn: async () => {
@@ -31,36 +29,89 @@ export default function LobbyList() {
     refetchIntervalInBackground: true, // keep polling even if tab is hidden
   });
 
+  // Check if user is already in a lobby and which one
+  const currentUserLobby = useMemo(() => {
+    if (!session.data?.user.id) return null;
+    
+    for (const lobby of lobbies) {
+      const userInLobby = lobby.users.find(
+        (lobbyUser) => lobbyUser.userId === session.data.user.id
+      );
+      if (userInLobby) {
+        return lobby;
+      }
+    }
+    return null;
+  }, [lobbies, session.data?.user.id]);
+
+  // Auto-join socket room if already in a lobby
+  useEffect(() => {
+    if (currentUserLobby && socket) {
+      socket.emit("joinLobby", { lobbyId: currentUserLobby.id });
+      console.log("🔌 Auto-joined socket room:", currentUserLobby.id);
+    }
+  }, [currentUserLobby, socket]);
+
+  // Listen for game start event
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleGameStarted = (data: {
+      chapter: string;
+      level: string;
+      lobbyKey: string;
+    }) => {
+      console.log("🎮 [Student] Game started!", data);
+      console.log(`   ↳ Redirecting to ${data.chapter} intro page`);
+      
+      // Redirect to the chapter intro page (which will auto-redirect to the level after 3s)
+      router.push(`/game/${data.chapter}`);
+    };
+
+    socket.on("gameStarted", handleGameStarted);
+
+    return () => {
+      socket.off("gameStarted", handleGameStarted);
+    };
+  }, [socket, router]);
+
   const { mutate: mjoinUserLobby } = useMutation({
     mutationFn: joinUserLobby,
-    onSuccess: () => {
-      console.log("Successfull Operation");
+    onSuccess: (data, variables) => {
+      console.log("Successfully joined lobby");
+      // Emit socket event to join the lobby room
+      if (socket) {
+        socket.emit("joinLobby", { lobbyId: variables.lobbyId });
+        console.log("🔌 Joined socket room:", variables.lobbyId);
+      }
     },
     onError: (data) => {
-      console.log("There was an error.");
-      console.log(data.message);
+      console.log("Error joining lobby:", data.message);
     },
   });
 
   const { mutate: mtransferUserLobby } = useMutation({
     mutationFn: transferUserLobby,
-    onSuccess: () => {
-      console.log("Successfull Operation");
+    onSuccess: (data, variables) => {
+      console.log("Successfully transferred to new lobby");
+      // Emit socket event to join the new lobby room
+      if (socket) {
+        socket.emit("joinLobby", { lobbyId: variables.lobbyId });
+        console.log("🔌 Transferred to socket room:", variables.lobbyId);
+      }
     },
     onError: (data) => {
-      console.log("There was an error.");
-      console.log(data.message);
+      console.log("Error transferring lobby:", data.message);
     },
   });
 
   const { mutate: mremoveUserFromLobby } = useMutation({
     mutationFn: removeUserFromLobby,
     onSuccess: () => {
-      console.log("Successfull Operation");
+      console.log("Successfully left lobby");
     },
     onError: (data) => {
-      console.log("There was an error.");
-      console.log(data.message);
+      console.log("Error leaving lobby:", data.message);
     },
   });
 
@@ -108,7 +159,6 @@ export default function LobbyList() {
               boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
               padding: "24px",
               position: "relative",
-              cursor: "pointer",
               transition: "transform 0.2s ease",
             }}
             onMouseEnter={(e) => {
@@ -116,21 +166,6 @@ export default function LobbyList() {
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = "translateY(0)";
-            }}
-            onClick={() => {
-              if (isAlreadyInALobby) {
-                mtransferUserLobby({
-                  lobbyId: lobby.id,
-                  userId: session.data?.user.id || "",
-                });
-              } else {
-                mjoinUserLobby({
-                  lobbyId: lobby.id,
-                  userId: session.data?.user.id || "",
-                });
-                console.log("joined Lobby ", lobby.name);
-                setIsAlreadyInALobby(true);
-              }
             }}
           >
             <div style={{ marginBottom: "16px" }}>
@@ -217,9 +252,32 @@ export default function LobbyList() {
               )}
             </div>
 
+            {/* Indicator if user is in this lobby */}
+            {currentUserLobby?.id === lobby.id && (
+              <div
+                style={{
+                  background: "#28a745",
+                  color: "#fff",
+                  padding: "8px",
+                  borderRadius: "8px",
+                  textAlign: "center",
+                  fontFamily: "'Press Start 2P', cursive",
+                  fontSize: "0.6rem",
+                  marginTop: "12px",
+                }}
+              >
+                ✓ You&apos;re in this lobby
+              </div>
+            )}
+
             <button
               style={{
-                background: "#28a745",
+                background:
+                  currentUserLobby?.id === lobby.id
+                    ? "#dc3545"
+                    : currentUserLobby
+                    ? "#ffc107"
+                    : "#28a745",
                 color: "#fff",
                 border: "none",
                 borderRadius: "8px",
@@ -234,10 +292,38 @@ export default function LobbyList() {
               }}
               onClick={(e) => {
                 e.stopPropagation();
-                console.log(`Joining lobby ${lobby.id}`);
+                
+                // If already in this lobby, leave it
+                if (currentUserLobby?.id === lobby.id) {
+                  mremoveUserFromLobby({
+                    userId: session.data?.user.id || "",
+                    lobbyId: lobby.id,
+                  });
+                  console.log("Left lobby:", lobby.name);
+                }
+                // If in a different lobby, transfer
+                else if (currentUserLobby) {
+                  mtransferUserLobby({
+                    lobbyId: lobby.id,
+                    userId: session.data?.user.id || "",
+                  });
+                  console.log("Transferred to lobby:", lobby.name);
+                }
+                // If not in any lobby, join
+                else {
+                  mjoinUserLobby({
+                    lobbyId: lobby.id,
+                    userId: session.data?.user.id || "",
+                  });
+                  console.log("Joined lobby:", lobby.name);
+                }
               }}
             >
-              Join Lobby
+              {currentUserLobby?.id === lobby.id
+                ? "Leave Lobby"
+                : currentUserLobby
+                ? "Switch Lobby"
+                : "Join Lobby"}
             </button>
           </div>
         ))}

@@ -68,12 +68,10 @@ export default function ChestQuestionPage() {
       return;
     }
 
-    // socket.on("connect", () => {
-    //   console.log(`Connected to server for chest ${chestNumber}`);
-    //   const questionId = `chest${chestNumber}`;
-    //   socket.emit("claimQuestion", { questionId });
-    //   setLoading(false);
-    // });
+    // Claim the question when opening the chest
+    const questionId = `chest${chestNumber}`;
+    console.log(`[ChestPage] Claiming question ${questionId}`);
+    socket.emit("claimQuestion", { questionId });
 
     socket.on("gameCompleted", (payload: any) => {
       console.log("[ChestQuestionPage] gameCompleted received", payload);
@@ -83,9 +81,10 @@ export default function ChestQuestionPage() {
     });
 
     return () => {
-      socket.disconnect();
+      // Don't disconnect socket, just remove listeners
+      socket.off("gameCompleted");
     };
-  }, [chestNumber, questionData, socket]);
+  }, [chestNumber, questionData, socket, router]);
 
   const handleElementClick = (elementType: string) => {
     if (isCompleted) return; // ignore after completion

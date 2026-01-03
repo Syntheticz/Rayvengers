@@ -213,39 +213,56 @@ export default function TeacherDashboard() {
   const startGame = () => {
     console.log("[teacher] startGame clicked");
     console.log("[teacher] socket:", socket);
+    console.log("[teacher] selectedLobby:", selectedLobby);
 
     const currentStudents = selectedLobby
-      ? lobbies.find((l) => l.id === selectedLobby)?.users
+      ? lobbies.find((l) => l.id === selectedLobby)?.users || []
       : [];
 
-    // console.log("[teacher] currentStudents.length:", currentStudents.length);
+    console.log("[teacher] currentStudents.length:", currentStudents.length);
 
-    // if (socket && currentStudents.length > 0) {
-    //   console.log(
-    //     "[teacher] Starting game for",
-    //     currentStudents.length,
-    //     "students"
-    //   );
-    //   socket.emit("startGame", {
-    //     chapter: "chapter1",
-    //     level: "level1",
-    //     groups: groups,
-    //     enabledChapters: chapters,
-    //     lobbyId: selectedLobby, // Include lobby ID
-    //   });
-    //   console.log("[teacher] startGame event emitted");
-    //   alert(
-    //     `Game started! ${currentStudents.length} students will be redirected to Chapter 1.`
-    //   );
-    // } else {
-    //   console.log(
-    //     "[teacher] Cannot start game - socket:",
-    //     !!socket,
-    //     "students:",
-    //     currentStudents.length
-    //   );
-    //   alert("No students in lobby to start the game.");
-    // }
+    if (!selectedLobby) {
+      alert("Please select a lobby first!");
+      return;
+    }
+
+    if (currentStudents.length === 0) {
+      alert("No students in the selected lobby to start the game.");
+      return;
+    }
+
+    if (!socket) {
+      console.log("[teacher] Cannot start game - socket not connected");
+      alert("Socket not connected. Please refresh the page.");
+      return;
+    }
+
+    console.log(
+      "[teacher] Starting game for",
+      currentStudents.length,
+      "students in lobby:",
+      selectedLobby
+    );
+
+    // Update lobby status to IN_PROGRESS
+    mupdateLobby({
+      id: selectedLobby,
+      updates: { status: "IN_PROGRESS" },
+    });
+
+    // Emit socket event to start the game
+    socket.emit("startGame", {
+      chapter: "chapter1",
+      level: "level1",
+      groups: groups,
+      enabledChapters: chapters,
+      lobbyId: selectedLobby,
+    });
+
+    console.log("[teacher] startGame event emitted");
+    alert(
+      `Game started! ${currentStudents.length} students will be redirected to Chapter 1.`
+    );
   };
 
   const exportCSV = () => {

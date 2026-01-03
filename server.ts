@@ -221,14 +221,49 @@ app.prepare().then(() => {
       }
     });
 
-    socket.on("startGame", (gameData) => {
+    socket.on("startGame", async (gameData) => {
       console.log("🎯 [startGame] Event received", gameData);
+      console.log("   ↳ lobbyId:", gameData.lobbyId);
 
-      const lobbyStudents = Object.values(waitingLobby);
+      if (!gameData.lobbyId) {
+        console.error("❌ [startGame] No lobbyId provided");
+        socket.emit("gameStartError", {
+          message: "No lobby selected",
+        });
+        return;
+      }
+
+      // Fetch lobby with users from database
+      const lobby = await prisma.lobby.findUnique({
+        where: { id: gameData.lobbyId },
+        include: {
+          users: {
+            include: {
+              user: true,
+            },
+          },
+        },
+      });
+
+      if (!lobby) {
+        console.error("❌ [startGame] Lobby not found:", gameData.lobbyId);
+        socket.emit("gameStartError", {
+          message: "Lobby not found",
+        });
+        return;
+      }
+
+      const lobbyStudents = lobby.users.map((lu) => ({
+        id: lu.user.id,
+        name: lu.user.name || "Unknown",
+        section: lu.user.section || "N/A",
+        role: lu.user.role || "student",
+      }));
 
       if (lobbyStudents.length === 0) {
+        console.warn("⚠️ [startGame] No students in lobby");
         socket.emit("gameStartError", {
-          message: "No students in waiting lobby",
+          message: "No students in lobby",
         });
         return;
       }
@@ -237,37 +272,64 @@ app.prepare().then(() => {
       const level = gameData.level || "level1";
       const lobbyKey = `${chapter}-${level}`;
 
+      console.log(
+        `🎮 [startGame] Starting game for ${lobbyStudents.length} students`
+      );
+      console.log(`   ↳ Chapter: ${chapter}, Level: ${level}`);
+      console.log(`   ↳ Lobby Key: ${lobbyKey}`);
+
       // Ensure active lobby exists
       if (!activeGameLobbies[lobbyKey]) {
         activeGameLobbies[lobbyKey] = {};
       }
 
-      // Move waiting students → into this game lobby
+      // Move students into this game lobby
       for (const student of lobbyStudents) {
         activeGameLobbies[lobbyKey][student.id] = student;
       }
-      Object.keys(waitingLobby).forEach((id) => delete waitingLobby[id]);
+
+      // ✅ Initialize question states based on level
+      const questionStates: Record<string, QuestionState> = {};
+      
+      // Initialize questions for the level (4 chests for level1 and level2)
+      for (let i = 1; i <= 4; i++) {
+        const questionId = `chest${i}`;
+        questionStates[questionId] = {
+          id: questionId,
+          status: "available",
+        };
+      }
 
       // ✅ Initialize game state per lobby
-      const gameState: GameState = {
+      const newGameState: GameState = {
         id: `${lobbyKey}-${Date.now()}`,
         isActive: true,
         chapter,
         level,
         startedAt: new Date(),
-        questionStates: {}, // TODO: preload questions
+        questionStates: questionStates,
         players: Object.keys(activeGameLobbies[lobbyKey]),
       };
 
-      gameSessions[lobbyKey] = gameState;
+      gameSessions[lobbyKey] = newGameState;
+      
+      // Update global gameState for backward compatibility
+      Object.assign(gameState, newGameState);
 
-      io.to(lobbyKey).emit(`${lobbyKey}:started`, gameState);
-      console.log(`📡 [startGame] ${lobbyKey}:started emitted`);
-      // console.log("[server socket] : students on lobby:", activeGameLobbies);
-      console.log("waiting lobby: ", waitingLobby);
+      // Emit to the specific lobby room
+      io.to(gameData.lobbyId).emit("gameStarted", {
+        chapter: chapter,
+        level: level,
+        lobbyKey: lobbyKey,
+        gameState: newGameState,
+      });
+
+      io.to(lobbyKey).emit(`${lobbyKey}:started`, newGameState);
+      console.log(`📡 [startGame] Game started event emitted to lobby room`);
+      console.log(`   ↳ Students redirected: ${lobbyStudents.length}`);
+      console.log(`   ↳ Questions initialized: ${Object.keys(questionStates).length}`);
 
       io.emit(`${lobbyKey}:update`, Object.values(activeGameLobbies[lobbyKey]));
-      io.to("waitingLobby").emit("gameStarted", { chapter: chapter });
     });
 
     socket.on("getQuestions", () => {
@@ -392,10 +454,23 @@ app.prepare().then(() => {
         } - ${isCorrect ? "Correct" : "Wrong"}`
       );
 
-      // Check if questions are complete
+      // Check if all questions are complete
       const allCompleted = Object.values(gameState.questionStates).every(
         (qs) => qs.status === "completed"
       );
+
+      if (allCompleted) {
+        console.log("🎉 All questions completed! Emitting gameCompleted event");
+        io.emit("gameCompleted", {
+          results: gameState.questionStates,
+          chapter: gameState.chapter,
+          level: gameState.level,
+          completedAt: new Date().toISOString(),
+        });
+        
+        // Mark game as inactive
+        gameState.isActive = false;
+      }
     });
 
     socket.on("endGame", (data: { chapter?: string; level?: string } = {}) => {

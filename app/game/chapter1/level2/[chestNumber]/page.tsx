@@ -1,7 +1,7 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
 import React, { useState, useEffect } from "react";
-import { io, Socket } from "socket.io-client";
+import { useSocket } from "@/lib/providers/socket-provider";
 
 interface Question {
   id: string;
@@ -47,7 +47,7 @@ export default function ChestQuestionPageLevel2() {
   const router = useRouter();
   const chestNumber = params.chestNumber as string;
   
-  const [socket, setSocket] = useState<Socket | null>(null);
+  const { socket } = useSocket();
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [attempts, setAttempts] = useState<number>(0);
@@ -63,22 +63,19 @@ export default function ChestQuestionPageLevel2() {
   }, [chestNumber]);
 
   useEffect(() => {
+    if (!socket) return;
     if (!questionData) {
       router.push("/game/chapter1/level2");
       return;
     }
 
-    const s = io("http://localhost:3000");
-    setSocket(s);
+    // Claim the question when opening the chest
+    const questionId = `chest${chestNumber}`;
+    console.log(`[level2] Claiming question ${questionId}`);
+    socket.emit("claimQuestion", { questionId });
+    setLoading(false);
 
-    s.on("connect", () => {
-      console.log(`[level2] Connected to server for chest ${chestNumber}`);
-      const questionId = `chest${chestNumber}`;
-      s.emit("claimQuestion", { questionId });
-      setLoading(false); 
-    });
-
-    s.on('gameCompleted', (payload: any) => {
+    socket.on('gameCompleted', (payload: any) => {
       console.log('[ChestQuestionPage][level2] gameCompleted received', payload);
       const chap = payload?.chapter || 'chapter1';
       const lvl = payload?.level || 'level2';
@@ -86,9 +83,10 @@ export default function ChestQuestionPageLevel2() {
     });
 
     return () => {
-      s.disconnect();
+      // Don't disconnect socket, just remove listeners
+      socket.off('gameCompleted');
     };
-  }, [chestNumber, questionData, router]);
+  }, [chestNumber, questionData, socket, router]);
 
   const handleElementClick = (elementType: string) => {
     if (isCompleted) return; // ignore after completion
